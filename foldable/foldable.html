@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Foldable — Computational Origami Generator</title>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>✂️</text></svg>">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f6f2;--surface:#fff;--card:#fffefa;--text:#1a1a18;--text-secondary:#6b6960;
+  --border:#e5e2da;--accent:#2a7d8c;--accent-hover:#1f6270;--mountain:#8c3a2a;
+  --valley:#2a7d8c;--cut:#2a8c3a;
+  --paper:#faf9f6;--crease:#c8c5be;--shadow:0 2px 12px rgba(0,0,0,.06);
+  --shadow-lg:0 8px 32px rgba(0,0,0,.1);--radius:12px;--radius-sm:8px;
+  --font:'Satoshi',system-ui,-apple-system,sans-serif;
+}
+[data-theme="dark"]{
+  --bg:#1a1918;--surface:#242320;--card:#2a2926;--text:#e8e6e0;--text-secondary:#9b9890;
+  --border:#3a3830;--paper:#2e2d28;--crease:#5a5850;--shadow:0 2px 12px rgba(0,0,0,.3);
+  --shadow-lg:0 8px 32px rgba(0,0,0,.4);
+}
+html{font-family:var(--font);background:var(--bg);color:var(--text);scroll-behavior:smooth}
+body{min-height:100vh;transition:background .3s,color .3s}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;
+  background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;
+  backdrop-filter:blur(12px)}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.logo-icon{width:28px;height:28px}
+.logo-text{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.3px}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.icon-btn{width:38px;height:38px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--surface);color:var(--text);cursor:pointer;display:flex;align-items:center;
+  justify-content:center;transition:all .2s}
+.icon-btn:hover{background:var(--bg);border-color:var(--accent)}
+.icon-btn svg{width:18px;height:18px}
+
+.hero{text-align:center;padding:40px 24px 24px}
+.hero h1{font-size:clamp(26px,4.5vw,40px);font-weight:700;letter-spacing:-.5px;margin-bottom:6px}
+.hero p{color:var(--text-secondary);font-size:16px;margin-bottom:20px}
+
+.tabs{display:flex;justify-content:center;gap:4px;padding:0 24px 20px}
+.tab{padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:var(--surface);
+  color:var(--text-secondary);font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;font-family:var(--font)}
+.tab:hover{border-color:var(--accent);color:var(--accent)}
+.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.gallery-section{max-width:900px;margin:0 auto;padding:0 24px}
+.shape-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+@media(max-width:700px){.shape-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:480px){.shape-grid{grid-template-columns:repeat(2,1fr)}}
+.shape-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px;cursor:pointer;transition:all .2s;text-align:center}
+.shape-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:var(--accent)}
+.shape-card.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.shape-card svg{width:100%;aspect-ratio:1;margin-bottom:6px}
+.shape-card .shape-name{font-size:13px;font-weight:500}
+
+.draw-section{max-width:600px;margin:0 auto;padding:0 24px;display:none}
+.draw-section.visible{display:block}
+.canvas-wrap{position:relative;width:100%;max-width:400px;margin:0 auto 16px;aspect-ratio:1;
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:crosshair}
+.canvas-wrap canvas{width:100%;height:100%;display:block}
+.draw-controls{display:flex;justify-content:center;gap:8px;margin-bottom:16px}
+.draw-btn{padding:8px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--surface);color:var(--text);font-size:13px;font-weight:500;cursor:pointer;
+  font-family:var(--font);transition:all .2s}
+.draw-btn:hover{border-color:var(--accent);color:var(--accent)}
+.draw-hint{text-align:center;color:var(--text-secondary);font-size:13px;margin-bottom:16px}
+
+.generate-wrap{text-align:center;padding:16px 24px 32px}
+.generate-btn{padding:14px 36px;border-radius:var(--radius);border:none;background:var(--accent);
+  color:#fff;font-size:16px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .2s;
+  box-shadow:0 4px 16px rgba(42,125,140,.3)}
+.generate-btn:hover{background:var(--accent-hover);transform:translateY(-1px);box-shadow:0 6px 20px rgba(42,125,140,.4)}
+.generate-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+
+.result-section{max-width:900px;margin:0 auto;padding:0 24px 48px;display:none}
+.result-section.visible{display:block}
+.result-header{text-align:center;margin-bottom:20px}
+.result-header h2{font-size:22px;font-weight:600;margin-bottom:4px}
+.result-header p{color:var(--text-secondary);font-size:14px}
+.result-panels{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}
+@media(max-width:640px){.result-panels{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.panel-title{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--text-secondary);margin-bottom:10px}
+.panel svg{width:100%;aspect-ratio:1;display:block}
+
+.step-viewer{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:24px;max-width:600px;margin:0 auto}
+.step-svg-wrap{width:100%;max-width:380px;margin:0 auto;aspect-ratio:1;display:flex;
+  align-items:center;justify-content:center;transition:opacity .25s,transform .25s}
+.step-svg-wrap.transitioning{opacity:.3;transform:scale(.97)}
+.step-svg-wrap svg{width:100%;height:100%;border-radius:var(--radius-sm)}
+.step-instruction{text-align:center;font-size:16px;padding:14px 8px;line-height:1.5;min-height:56px}
+.step-counter{text-align:center;font-size:13px;color:var(--text-secondary);font-weight:500;margin-bottom:8px}
+.progress-bar{width:100%;max-width:300px;height:4px;background:var(--border);border-radius:2px;
+  margin:0 auto 16px;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+.step-nav{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 0}
+.nav-btn{padding:9px 20px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--surface);color:var(--text);font-size:14px;font-weight:500;cursor:pointer;
+  font-family:var(--font);transition:all .2s;display:flex;align-items:center;gap:5px}
+.nav-btn:hover:not(:disabled){background:var(--bg);border-color:var(--accent)}
+.nav-btn:disabled{opacity:.35;cursor:not-allowed}
+.nav-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.nav-btn.primary:hover:not(:disabled){background:var(--accent-hover)}
+
+.legend{display:flex;justify-content:center;gap:16px;margin:12px 0;font-size:12px;color:var(--text-secondary)}
+.legend-item{display:flex;align-items:center;gap:5px}
+.legend-line{width:24px;height:2px}
+.legend-mountain{background:var(--mountain);background:repeating-linear-gradient(90deg,var(--mountain) 0 2px,transparent 2px 5px,var(--mountain) 5px 12px,transparent 12px 15px)}
+.legend-valley{background:repeating-linear-gradient(90deg,var(--valley) 0 5px,transparent 5px 8px)}
+.legend-cut{background:var(--cut)}
+
+@keyframes pulse-fold{0%,100%{opacity:1}50%{opacity:.5}}
+.fold-line-active{animation:pulse-fold 1.5s ease-in-out infinite}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <svg class="logo-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 28L16 4L28 28H4Z" fill="var(--accent)" opacity=".15"/>
+      <path d="M4 28L16 4L28 28" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" fill="none"/>
+      <path d="M10 18L16 8L22 18" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round" fill="none" opacity=".5"/>
+    </svg>
+    <span class="logo-text">Foldable</span>
+  </div>
+  <div class="topbar-right">
+    <button class="icon-btn" id="themeToggle" title="Toggle dark mode">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    </button>
+    <a href="https://github.com" target="_blank" class="icon-btn" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+    </a>
+  </div>
+</div>
+
+<section class="hero">
+  <h1>Fold anything. Step by step.</h1>
+  <p>Computational origami — pick a shape and we generate the fold pattern</p>
+</section>
+
+<div class="tabs">
+  <button class="tab active" data-tab="gallery">Preset Shapes</button>
+  <button class="tab" data-tab="draw">Draw Custom</button>
+</div>
+
+<div class="gallery-section" id="gallerySection">
+  <div class="shape-grid" id="shapeGrid"></div>
+</div>
+
+<div class="draw-section" id="drawSection">
+  <div class="draw-hint">Click to place vertices. Click near the first point to close the shape.</div>
+  <div class="canvas-wrap">
+    <canvas id="drawCanvas" width="400" height="400"></canvas>
+  </div>
+  <div class="draw-controls">
+    <button class="draw-btn" id="undoBtn">Undo</button>
+    <button class="draw-btn" id="clearBtn">Clear</button>
+  </div>
+</div>
+
+<div class="generate-wrap">
+  <button class="generate-btn" id="generateBtn" disabled>Generate Fold Pattern</button>
+</div>
+
+<div class="result-section" id="resultSection">
+  <div class="result-header">
+    <h2 id="resultTitle">Fold Pattern</h2>
+    <p id="resultInfo"></p>
+  </div>
+  <div class="result-panels">
+    <div class="panel">
+      <div class="panel-title">Target Shape</div>
+      <svg id="targetSvg" viewBox="0 0 120 120"></svg>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Crease Pattern</div>
+      <svg id="creaseSvg" viewBox="0 0 120 120"></svg>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-line legend-mountain"></div>Mountain</div>
+        <div class="legend-item"><div class="legend-line legend-valley"></div>Valley</div>
+        <div class="legend-item"><div class="legend-line legend-cut"></div>Cut</div>
+      </div>
+    </div>
+  </div>
+  <div class="step-viewer" id="stepViewer">
+    <div class="step-counter" id="stepCounter"></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="step-svg-wrap" id="stepSvgWrap"></div>
+    <div class="step-instruction" id="stepInstruction"></div>
+    <div class="step-nav">
+      <button class="nav-btn" id="prevBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+        Prev
+      </button>
+      <button class="nav-btn primary" id="nextBtn">
+        Next
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+// PART 1: GEOMETRY UTILITIES
+// ══════════════════════════════════════════════════════════════════════
+const EPS = 1e-7;
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function vec(a, b) { return [b[0] - a[0], b[1] - a[1]]; }
+function vadd(a, b) { return [a[0] + b[0], a[1] + b[1]]; }
+function vsub(a, b) { return [a[0] - b[0], a[1] - b[1]]; }
+function vscale(v, s) { return [v[0] * s, v[1] * s]; }
+function vlen(v) { return Math.sqrt(v[0] * v[0] + v[1] * v[1]); }
+function vnorm(v) { const l = vlen(v); return l < EPS ? [0, 0] : [v[0] / l, v[1] / l]; }
+function vdot(a, b) { return a[0] * b[0] + a[1] * b[1]; }
+function vcross(a, b) { return a[0] * b[1] - a[1] * b[0]; }
+function vperp(v) { return [-v[1], v[0]]; } // 90 deg CCW rotation
+function vlerp(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
+function vdist(a, b) { return vlen(vsub(a, b)); }
+function veq(a, b) { return Math.abs(a[0] - b[0]) < EPS && Math.abs(a[1] - b[1]) < EPS; }
+
+// Line-line intersection: p1+t*d1 = p2+s*d2. Returns [point, t, s] or null
+function lineLineIntersect(p1, d1, p2, d2) {
+  const denom = vcross(d1, d2);
+  if (Math.abs(denom) < EPS) return null;
+  const dp = vsub(p2, p1);
+  const t = vcross(dp, d2) / denom;
+  const s = vcross(dp, d1) / denom;
+  return [vadd(p1, vscale(d1, t)), t, s];
+}
+
+// Segment-segment intersection
+function segSegIntersect(a1, a2, b1, b2) {
+  const da = vsub(a2, a1), db = vsub(b2, b1);
+  const r = lineLineIntersect(a1, da, b1, db);
+  if (!r) return null;
+  const [pt, t, s] = r;
+  if (t >= -EPS && t <= 1 + EPS && s >= -EPS && s <= 1 + EPS) return pt;
+  return null;
+}
+
+// Project point onto line defined by (lp, ld), return [foot, t]
+function projectToLine(p, lp, ld) {
+  const t = vdot(vsub(p, lp), ld) / vdot(ld, ld);
+  return [vadd(lp, vscale(ld, t)), t];
+}
+
+// Project point onto segment, return [foot, dist, t]
+function projectToSegment(p, a, b) {
+  const d = vsub(b, a);
+  let t = vdot(vsub(p, a), d) / vdot(d, d);
+  t = Math.max(0, Math.min(1, t));
+  const foot = vadd(a, vscale(d, t));
+  return [foot, vdist(p, foot), t];
+}
+
+// Signed area of polygon (CCW > 0)
+function polyArea(poly) {
+  let a = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const j = (i + 1) % poly.length;
+    a += poly[i][0] * poly[j][1] - poly[j][0] * poly[i][1];
+  }
+  return a / 2;
+}
+
+function polyCentroid(poly) {
+  let cx = 0, cy = 0;
+  for (const p of poly) { cx += p[0]; cy += p[1]; }
+  return [cx / poly.length, cy / poly.length];
+}
+
+function ensureCCW(poly) {
+  return polyArea(poly) < 0 ? poly.slice().reverse() : poly;
+}
+
+function isConvexPoly(poly) {
+  const n = poly.length;
+  if (n < 3) return false;
+  let sign = 0;
+  for (let i = 0; i < n; i++) {
+    const a = poly[i], b = poly[(i + 1) % n], c = poly[(i + 2) % n];
+    const cross = vcross(vsub(b, a), vsub(c, b));
+    if (Math.abs(cross) < EPS) continue;
+    if (sign === 0) sign = cross > 0 ? 1 : -1;
+    else if ((cross > 0 ? 1 : -1) !== sign) return false;
+  }
+  return true;
+}
+
+// Sutherland-Hodgman polygon clipping against a half-plane
+// (all points on the LEFT side of the line from a to b are kept)
+function clipPolyByLine(poly, a, b) {
+  const out = [];
+  const n = poly.length;
+  if (n === 0) return out;
+  const edgeDir = vsub(b, a);
+  function inside(p) { return vcross(edgeDir, vsub(p, a)) >= -EPS; }
+  for (let i = 0; i < n; i++) {
+    const cur = poly[i], next = poly[(i + 1) % n];
+    const curIn = inside(cur), nextIn = inside(next);
+    if (curIn) out.push(cur);
+    if (curIn !== nextIn) {
+      const ix = segSegIntersect(cur, next, a, b) || lineLineIntersect(cur, vsub(next, cur), a, edgeDir)?.[0];
+      if (ix) out.push(ix);
+    }
+  }
+  return out;
+}
+
+// Compute inward bisector direction at vertex i of a CCW polygon
+function bisectorDir(poly, i) {
+  const n = poly.length;
+  const prev = poly[(i - 1 + n) % n], cur = poly[i], next = poly[(i + 1) % n];
+  const e1 = vnorm(vsub(cur, prev)); // direction of incoming edge
+  const e2 = vnorm(vsub(next, cur)); // direction of outgoing edge
+  const n1 = vperp(e1);  // inward normal of edge 1 (left = inward for CCW)
+  const n2 = vperp(e2);  // inward normal of edge 2
+  const bis = vnorm(vadd(n1, n2));
+  // Speed: how fast this vertex moves inward
+  const speed = 1 / Math.max(vdot(bis, n2), EPS);
+  return { dir: bis, speed };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PART 2: STRAIGHT SKELETON
+// ══════════════════════════════════════════════════════════════════════
+
+// Compute straight skeleton of a convex polygon
+// Returns { skVerts: [{point, time}], skEdges: [{from, to}] }
+function straightSkeleton(poly) {
+  poly = ensureCCW(poly);
+  const n = poly.length;
+  if (n < 3) return { skVerts: [], skEdges: [] };
+
+  const skVerts = []; // skeleton vertices with time
+  const skEdges = []; // skeleton edges connecting skeleton vertices
+
+  // Track active wavefront vertices
+  // Each wavefront vertex has: point, originalIdx, bisector info, skeleton vertex index (when created)
+  let wf = poly.map((p, i) => {
+    const b = bisectorDir(poly, i);
+    return { point: [...p], idx: i, dir: b.dir, speed: b.speed, skIdx: -1 };
+  });
+
+  // For each original polygon vertex, create a skeleton vertex at time 0
+  for (let i = 0; i < n; i++) {
+    skVerts.push({ point: [...poly[i]], time: 0, origIdx: i });
+    wf[i].skIdx = i;
+  }
+
+  let time = 0;
+
+  // Iteratively process edge events
+  for (let iter = 0; iter < n * 2 && wf.length > 2; iter++) {
+    // Find the next edge event: which edge collapses first?
+    let minT = Infinity, minIdx = -1;
+
+    for (let i = 0; i < wf.length; i++) {
+      const j = (i + 1) % wf.length;
+      const vi = wf[i], vj = wf[j];
+      // Solve for time when these two wavefront vertices meet
+      // vi.point + t*vi.speed*vi.dir = vj.point + t*vj.speed*vj.dir
+      const dp = vsub(vj.point, vi.point);
+      const dv = vsub(vscale(vj.dir, vj.speed), vscale(vi.dir, vi.speed));
+      // This is approximate: use perpendicular distance / closing speed
+      const edgeDir = vnorm(vsub(vj.point, vi.point));
+      const edgeNormal = vperp(edgeDir);
+
+      // Better: solve the intersection of two rays from current positions
+      const ri = lineLineIntersect(vi.point, vscale(vi.dir, vi.speed), vj.point, vscale(vj.dir, vj.speed));
+      if (ri && ri[1] > EPS && ri[2] > EPS) {
+        const t = Math.min(ri[1], ri[2]); // approximate event time
+        if (t < minT) {
+          minT = t;
+          minIdx = i;
+        }
+      } else {
+        // Edges moving apart or parallel — compute based on distance closing
+        const closingSpeed = vdot(vsub(vscale(vi.dir, vi.speed), vscale(vj.dir, vj.speed)), edgeNormal);
+        if (closingSpeed > EPS) {
+          const dist = Math.abs(vdot(dp, edgeNormal));
+          const t = dist / closingSpeed;
+          if (t > EPS && t < minT) {
+            minT = t;
+            minIdx = i;
+          }
+        }
+      }
+    }
+
+    if (minIdx < 0 || minT > 1000) break;
+
+    // Advance all wavefront vertices by minT
+    for (const v of wf) {
+      v.point = vadd(v.point, vscale(v.dir, v.speed * minT));
+    }
+    time += minT;
+
+    // Collapse edge at minIdx
+    const i = minIdx;
+    const j = (i + 1) % wf.length;
+    const vi = wf[i], vj = wf[j];
+    const meetPoint = vlerp(vi.point, vj.point, 0.5);
+
+    // Create new skeleton vertex
+    const newSkIdx = skVerts.length;
+    skVerts.push({ point: [...meetPoint], time });
+
+    // Connect to previous skeleton vertices
+    skEdges.push({ from: vi.skIdx, to: newSkIdx });
+    skEdges.push({ from: vj.skIdx, to: newSkIdx });
+
+    // Remove collapsed vertex (keep i, remove j, or merge)
+    // Replace both with a single merged vertex
+    const newWfPoly = wf.map(w => w.point);
+    // Remove j from wavefront
+    wf.splice(j > i ? j : 0, 1);
+    const mergedIdx = j > i ? i : Math.max(0, i - 1);
+    if (mergedIdx < wf.length) {
+      wf[mergedIdx].point = [...meetPoint];
+      wf[mergedIdx].skIdx = newSkIdx;
+      // Recompute bisector for merged vertex
+      if (wf.length >= 3) {
+        const wfPoly = wf.map(w => w.point);
+        const b = bisectorDir(wfPoly, mergedIdx);
+        wf[mergedIdx].dir = b.dir;
+        wf[mergedIdx].speed = b.speed;
+      }
+    }
+  }
+
+  // If 2 vertices remain, they meet at a final point
+  if (wf.length === 2) {
+    const finalPt = vlerp(wf[0].point, wf[1].point, 0.5);
+    const finalIdx = skVerts.length;
+    skVerts.push({ point: [...finalPt], time: time + vdist(wf[0].point, wf[1].point) / 2 });
+    skEdges.push({ from: wf[0].skIdx, to: finalIdx });
+    skEdges.push({ from: wf[1].skIdx, to: finalIdx });
+  } else if (wf.length === 1) {
+    // Already converged
+  }
+
+  return { skVerts, skEdges };
+}
+
+// For non-convex polygons: decompose into convex parts, compute skeleton for each
+function convexDecompose(poly) {
+  // Simple ear-clipping-based convex decomposition
+  // Returns array of convex polygons
+  poly = ensureCCW(poly);
+  if (isConvexPoly(poly)) return [poly];
+
+  // Fan triangulation from centroid as simple fallback
+  const c = polyCentroid(poly);
+  const parts = [];
+  for (let i = 0; i < poly.length; i++) {
+    const j = (i + 1) % poly.length;
+    parts.push([c, poly[i], poly[j]]);
+  }
+  return parts;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PART 3: CREASE PATTERN GENERATION (Fold-and-Cut)
+// ══════════════════════════════════════════════════════════════════════
+
+const PAPER = [[0, 0], [100, 0], [100, 100], [0, 100]];
+
+// Generate the crease pattern for fold-and-cut of a target polygon
+function generateCreasePattern(target) {
+  target = ensureCCW(target);
+  const creases = [];
+  const cutLines = [];
+
+  // 1. Cut lines = edges of the target polygon
+  for (let i = 0; i < target.length; i++) {
+    const j = (i + 1) % target.length;
+    cutLines.push({ from: [...target[i]], to: [...target[j]], type: 'cut' });
+  }
+
+  // 2. Compute straight skeleton of the target polygon
+  const targetSk = straightSkeleton(target);
+
+  // 3. Skeleton edges of the target become creases
+  for (const e of targetSk.skEdges) {
+    const from = targetSk.skVerts[e.from].point;
+    const to = targetSk.skVerts[e.to].point;
+    if (vdist(from, to) > EPS) {
+      creases.push({ from: [...from], to: [...to], type: 'mountain', depth: targetSk.skVerts[e.to].time });
+    }
+  }
+
+  // 4. Perpendicular creases from skeleton vertices to target edges
+  for (const sv of targetSk.skVerts) {
+    if (sv.time < EPS) continue; // skip original vertices
+    // Project to each target edge, keep the closest ones
+    const projections = [];
+    for (let i = 0; i < target.length; i++) {
+      const j = (i + 1) % target.length;
+      const [foot, dist, t] = projectToSegment(sv.point, target[i], target[j]);
+      if (t > EPS && t < 1 - EPS) {
+        projections.push({ foot, dist, edgeIdx: i });
+      }
+    }
+    // Add perpendiculars to the two closest edges
+    projections.sort((a, b) => a.dist - b.dist);
+    for (let k = 0; k < Math.min(2, projections.length); k++) {
+      const p = projections[k];
+      if (vdist(sv.point, p.foot) > 1) { // skip very short ones
+        creases.push({ from: [...sv.point], to: [...p.foot], type: 'valley', depth: sv.time });
+      }
+    }
+  }
+
+  // 5. Connect target skeleton to paper boundary
+  // Extend from each target polygon vertex to the nearest paper boundary edge
+  for (let i = 0; i < target.length; i++) {
+    const tp = target[i];
+    let bestFoot = null, bestDist = Infinity;
+    for (let e = 0; e < PAPER.length; e++) {
+      const f = (e + 1) % PAPER.length;
+      const [foot, dist] = projectToSegment(tp, PAPER[e], PAPER[f]);
+      if (dist < bestDist) { bestDist = dist; bestFoot = foot; }
+    }
+    // Also check paper corners
+    for (const pc of PAPER) {
+      const d = vdist(tp, pc);
+      if (d < bestDist) { bestDist = d; bestFoot = pc; }
+    }
+    if (bestFoot && bestDist > 2) {
+      creases.push({ from: [...tp], to: [...bestFoot], type: 'valley', depth: 0 });
+    }
+  }
+
+  // 6. Also extend from interior skeleton vertices toward paper boundary
+  for (const sv of targetSk.skVerts) {
+    if (sv.time < EPS) continue;
+    // Extend bisector outward to paper boundary
+    const center = polyCentroid(target);
+    const outDir = vnorm(vsub(sv.point, center));
+    // Intersect with paper boundary
+    let bestT = Infinity, bestPt = null;
+    for (let e = 0; e < PAPER.length; e++) {
+      const f = (e + 1) % PAPER.length;
+      const r = lineLineIntersect(sv.point, outDir, PAPER[e], vsub(PAPER[f], PAPER[e]));
+      if (r && r[1] > EPS && r[2] >= -EPS && r[2] <= 1 + EPS && r[1] < bestT) {
+        bestT = r[1];
+        bestPt = r[0];
+      }
+    }
+    if (bestPt && vdist(sv.point, bestPt) > 2) {
+      creases.push({ from: [...sv.point], to: [...bestPt], type: 'mountain', depth: sv.time });
+    }
+  }
+
+  // 7. Add paper diagonal creases (these help with flat-foldability)
+  const paperCenter = [50, 50];
+  for (const corner of PAPER) {
+    // Check if this diagonal interferes with target
+    let interferes = false;
+    for (let i = 0; i < target.length; i++) {
+      const j = (i + 1) % target.length;
+      if (segSegIntersect(corner, paperCenter, target[i], target[j])) {
+        interferes = true;
+        break;
+      }
+    }
+    if (!interferes) {
+      creases.push({ from: [...corner], to: [...paperCenter], type: 'mountain', depth: 0 });
+    }
+  }
+
+  // 8. M/V assignment refinement using depth parity
+  for (const c of creases) {
+    // Simple rule: skeleton edges are mountain, perpendiculars are valley
+    // Boundary connectors alternate
+    if (c.depth > 0 && c.type !== 'cut') {
+      c.type = Math.round(c.depth * 2) % 2 === 0 ? 'valley' : 'mountain';
+    }
+  }
+
+  // Remove duplicate / overlapping creases
+  const uniqueCreases = [];
+  for (const c of creases) {
+    const isDup = uniqueCreases.some(uc =>
+      (vdist(c.from, uc.from) < 2 && vdist(c.to, uc.to) < 2) ||
+      (vdist(c.from, uc.to) < 2 && vdist(c.to, uc.from) < 2)
+    );
+    if (!isDup) uniqueCreases.push(c);
+  }
+
+  return { creases: uniqueCreases, cutLines, skeleton: targetSk };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PART 4: STEP SEQUENCING
+// ══════════════════════════════════════════════════════════════════════
+
+function generateSteps(creasePattern, target) {
+  const { creases, cutLines } = creasePattern;
+  const steps = [];
+  let paperOutline = PAPER.map(p => [...p]);
+  const existingCreases = [];
+
+  // Sort creases: boundary-touching first, then by length descending
+  const sorted = [...creases].sort((a, b) => {
+    const aEdge = touchesBoundary(a);
+    const bEdge = touchesBoundary(b);
+    if (aEdge !== bEdge) return bEdge ? 1 : -1;
+    const aLen = vdist(a.from, a.to);
+    const bLen = vdist(b.from, b.to);
+    return bLen - aLen;
+  });
+
+  // Group very close creases into a single step to avoid excessive step counts
+  const grouped = groupCreases(sorted);
+
+  // Step 0: Show the paper with the target shape marked
+  steps.push({
+    id: 1,
+    instruction: "Start with a square sheet. The dashed outline shows your target shape.",
+    paperShape: PAPER.map(p => [...p]),
+    existingCreases: cutLines.map(c => ({ from: c.from, to: c.to, type: 'crease' })),
+    newFold: null,
+    arrows: []
+  });
+
+  // Generate fold steps
+  for (let g = 0; g < grouped.length && steps.length < 16; g++) {
+    const group = grouped[g];
+    const primary = group[0]; // main crease of this step
+
+    const instruction = generateInstruction(primary, paperOutline, steps.length);
+    const arrow = computeFoldArrow(primary, paperOutline);
+
+    steps.push({
+      id: steps.length + 1,
+      instruction,
+      paperShape: paperOutline.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]),
+      existingCreases: existingCreases.map(c => ({ from: c.from, to: c.to, type: 'crease' })),
+      newFold: { from: primary.from, to: primary.to, type: primary.type },
+      arrows: arrow ? [arrow] : []
+    });
+
+    // Update state
+    for (const c of group) existingCreases.push(c);
+
+    // Update paper outline by clipping (fold the smaller side over)
+    const leftSide = clipPolyByLine(paperOutline, primary.from, primary.to);
+    const rightSide = clipPolyByLine(paperOutline, primary.to, primary.from);
+    if (leftSide.length >= 3 && rightSide.length >= 3) {
+      const leftArea = Math.abs(polyArea(leftSide));
+      const rightArea = Math.abs(polyArea(rightSide));
+      paperOutline = leftArea >= rightArea ? leftSide : rightSide;
+    }
+  }
+
+  // Final step: cut and unfold
+  steps.push({
+    id: steps.length + 1,
+    instruction: "Cut along the marked line through all layers. Unfold carefully to reveal your shape!",
+    paperShape: target.map(p => [...p]),
+    existingCreases: [],
+    newFold: null,
+    arrows: []
+  });
+
+  return steps;
+}
+
+function touchesBoundary(crease) {
+  return PAPER.some(corner =>
+    vdist(crease.from, corner) < 3 || vdist(crease.to, corner) < 3
+  ) || [crease.from, crease.to].some(p =>
+    Math.abs(p[0]) < 2 || Math.abs(p[0] - 100) < 2 ||
+    Math.abs(p[1]) < 2 || Math.abs(p[1] - 100) < 2
+  );
+}
+
+function groupCreases(creases) {
+  // Group nearby parallel creases into single steps
+  const groups = [];
+  const used = new Set();
+  for (let i = 0; i < creases.length; i++) {
+    if (used.has(i)) continue;
+    const group = [creases[i]];
+    used.add(i);
+    const dir = vnorm(vsub(creases[i].to, creases[i].from));
+    const mid = vlerp(creases[i].from, creases[i].to, 0.5);
+    for (let j = i + 1; j < creases.length; j++) {
+      if (used.has(j)) continue;
+      const d2 = vnorm(vsub(creases[j].to, creases[j].from));
+      const m2 = vlerp(creases[j].from, creases[j].to, 0.5);
+      // Group if nearly parallel and close
+      if (Math.abs(vdot(dir, d2)) > 0.95 && vdist(mid, m2) < 15) {
+        group.push(creases[j]);
+        used.add(j);
+      }
+    }
+    groups.push(group);
+  }
+  return groups;
+}
+
+function generateInstruction(crease, paper, stepNum) {
+  const dx = crease.to[0] - crease.from[0];
+  const dy = crease.to[1] - crease.from[1];
+  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+  const foldName = crease.type === 'mountain' ? 'Mountain fold' : 'Valley fold';
+
+  if (Math.abs(angle) < 20 || Math.abs(angle - 180) < 20 || Math.abs(angle + 180) < 20) {
+    return `${foldName}: fold along the horizontal crease.`;
+  } else if (Math.abs(Math.abs(angle) - 90) < 20) {
+    return `${foldName}: fold along the vertical crease.`;
+  } else if (Math.abs(Math.abs(angle) - 45) < 15 || Math.abs(Math.abs(angle) - 135) < 15) {
+    return `${foldName}: fold along the diagonal crease.`;
+  } else {
+    const midX = (crease.from[0] + crease.to[0]) / 2;
+    const midY = (crease.from[1] + crease.to[1]) / 2;
+    const pos = midX < 40 ? 'left' : midX > 60 ? 'right' : 'center';
+    return `${foldName}: fold along the angled crease on the ${pos} side.`;
+  }
+}
+
+function computeFoldArrow(crease, paper) {
+  const mid = vlerp(crease.from, crease.to, 0.5);
+  const dir = vnorm(vsub(crease.to, crease.from));
+  const normal = vperp(dir);
+  // Arrow goes from one side of the fold to the other
+  const from = vadd(mid, vscale(normal, 15));
+  const to = vsub(mid, vscale(normal, 15));
+  // Determine which side is "folding" — the smaller area side
+  return {
+    from: [Math.round(from[0]), Math.round(from[1])],
+    to: [Math.round(to[0]), Math.round(to[1])],
+    type: crease.type === 'mountain' ? 'fold-behind' : 'fold'
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PART 5: PRESET SHAPES
+// ══════════════════════════════════════════════════════════════════════
+
+const PRESETS = [
+  { id: 'star', name: 'Star', emoji: '⭐',
+    polygon: (() => { const pts = []; for (let i = 0; i < 5; i++) {
+      const aOuter = -Math.PI/2 + i * 2*Math.PI/5;
+      const aInner = aOuter + Math.PI/5;
+      pts.push([50 + 38*Math.cos(aOuter), 50 + 38*Math.sin(aOuter)]);
+      pts.push([50 + 16*Math.cos(aInner), 50 + 16*Math.sin(aInner)]);
+    } return pts; })()
+  },
+  { id: 'heart', name: 'Heart', emoji: '❤️',
+    polygon: (() => { const pts = []; for (let i = 0; i <= 20; i++) {
+      const t = i / 20 * 2 * Math.PI;
+      const x = 16 * Math.pow(Math.sin(t), 3);
+      const y = -(13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t));
+      pts.push([50 + x * 2.2, 48 + y * 2.2]);
+    } return pts; })()
+  },
+  { id: 'arrow', name: 'Arrow', emoji: '➡️',
+    polygon: [[15,38],[60,38],[60,20],[90,50],[60,80],[60,62],[15,62]]
+  },
+  { id: 'house', name: 'House', emoji: '🏠',
+    polygon: [[22,55],[22,88],[78,88],[78,55],[50,22]]
+  },
+  { id: 'tree', name: 'Tree', emoji: '🌲',
+    polygon: [[50,10],[78,45],[65,45],[82,70],[35,90],[35,70],[18,70],[35,45],[22,45]]
+  },
+  { id: 'bird', name: 'Bird', emoji: '🐦',
+    polygon: [[10,50],[25,35],[40,38],[50,22],[60,38],[75,35],[92,48],[75,55],[60,52],[50,58],[40,52],[25,55]]
+  },
+  { id: 'fish', name: 'Fish', emoji: '🐟',
+    polygon: [[12,50],[30,28],[55,22],[78,30],[92,50],[78,70],[55,78],[30,72]]
+  },
+  { id: 'diamond', name: 'Diamond', emoji: '💎',
+    polygon: [[50,8],[82,40],[68,50],[50,92],[32,50],[18,40]]
+  },
+  { id: 'cross', name: 'Cross', emoji: '✚',
+    polygon: [[36,12],[64,12],[64,36],[88,36],[88,64],[64,64],[64,88],[36,88],[36,64],[12,64],[12,36],[36,36]]
+  },
+  { id: 'moon', name: 'Moon', emoji: '🌙',
+    polygon: (() => { const pts = []; for (let i = 0; i <= 16; i++) {
+      const a = -Math.PI/2 + i/16 * Math.PI;
+      pts.push([50 + 38*Math.cos(a), 50 + 38*Math.sin(a)]);
+    } for (let i = 16; i >= 0; i--) {
+      const a = -Math.PI/2 + i/16 * Math.PI;
+      pts.push([35 + 30*Math.cos(a), 50 + 30*Math.sin(a)]);
+    } return pts; })()
+  },
+  { id: 'lightning', name: 'Lightning', emoji: '⚡',
+    polygon: [[48,8],[68,8],[42,46],[60,46],[28,92],[48,52],[32,52]]
+  },
+  { id: 'cat', name: 'Cat Face', emoji: '🐱',
+    polygon: [[28,25],[38,10],[48,25],[52,25],[62,10],[72,25],[82,45],[78,72],[65,85],[50,90],[35,85],[22,72],[18,45]]
+  }
+];
+
+// ══════════════════════════════════════════════════════════════════════
+// PART 6: SVG RENDERING
+// ══════════════════════════════════════════════════════════════════════
+
+function el(tag, attrs = {}) {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+
+function renderTargetShape(target, svgEl) {
+  svgEl.innerHTML = '';
+  const defs = el('defs');
+  const shadow = el('filter', { id: 'ts-shadow', x: '-5%', y: '-5%', width: '115%', height: '115%' });
+  shadow.appendChild(el('feDropShadow', { dx: '0.5', dy: '1', stdDeviation: '1.5', 'flood-color': '#00000015' }));
+  defs.appendChild(shadow);
+  svgEl.appendChild(defs);
+
+  svgEl.appendChild(el('rect', { x: 10, y: 10, width: 100, height: 100, fill: 'var(--paper)',
+    stroke: 'var(--text)', 'stroke-width': 0.5, rx: 1, filter: 'url(#ts-shadow)' }));
+  const pts = target.map(p => `${p[0]+10},${p[1]+10}`).join(' ');
+  svgEl.appendChild(el('polygon', { points: pts, fill: 'var(--accent)', opacity: '0.2',
+    stroke: 'var(--accent)', 'stroke-width': 1.2, 'stroke-linejoin': 'round' }));
+}
+
+function renderCreasePattern(pattern, target, svgEl) {
+  svgEl.innerHTML = '';
+  svgEl.appendChild(el('rect', { x: 10, y: 10, width: 100, height: 100, fill: 'var(--paper)',
+    stroke: 'var(--text)', 'stroke-width': 0.5, rx: 1 }));
+
+  // Draw creases
+  for (const c of pattern.creases) {
+    const color = c.type === 'mountain' ? 'var(--mountain)' : 'var(--valley)';
+    const dash = c.type === 'mountain' ? '1.5,2,5,2' : '4,2.5';
+    svgEl.appendChild(el('line', {
+      x1: c.from[0]+10, y1: c.from[1]+10, x2: c.to[0]+10, y2: c.to[1]+10,
+      stroke: color, 'stroke-width': 0.8, 'stroke-dasharray': dash, 'stroke-linecap': 'round'
+    }));
+  }
+
+  // Draw cut lines
+  for (const c of pattern.cutLines) {
+    svgEl.appendChild(el('line', {
+      x1: c.from[0]+10, y1: c.from[1]+10, x2: c.to[0]+10, y2: c.to[1]+10,
+      stroke: 'var(--cut)', 'stroke-width': 1.4, 'stroke-linecap': 'round'
+    }));
+  }
+}
+
+function renderStep(step, svgEl) {
+  svgEl.innerHTML = '';
+  svgEl.setAttribute('viewBox', '0 0 120 120');
+  const defs = el('defs');
+
+  // Arrow markers
+  const foldMarker = el('marker', { id: 'af', viewBox: '0 0 10 10', refX: 8, refY: 5,
+    markerWidth: 5, markerHeight: 5, orient: 'auto' });
+  foldMarker.appendChild(el('path', { d: 'M 1 2 L 8 5 L 1 8 Z', fill: 'var(--valley)' }));
+  defs.appendChild(foldMarker);
+
+  const behindMarker = el('marker', { id: 'ab', viewBox: '0 0 10 10', refX: 8, refY: 5,
+    markerWidth: 5, markerHeight: 5, orient: 'auto' });
+  behindMarker.appendChild(el('path', { d: 'M 1 2 L 8 5 L 1 8 Z', fill: 'var(--mountain)' }));
+  defs.appendChild(behindMarker);
+
+  const shadow = el('filter', { id: 'ps', x: '-5%', y: '-5%', width: '115%', height: '115%' });
+  shadow.appendChild(el('feDropShadow', { dx: '0.5', dy: '1', stdDeviation: '1.5', 'flood-color': '#00000015' }));
+  defs.appendChild(shadow);
+  svgEl.appendChild(defs);
+
+  svgEl.appendChild(el('rect', { x: 0, y: 0, width: 120, height: 120, fill: 'var(--bg)', rx: 4 }));
+
+  // Paper shape
+  if (step.paperShape && step.paperShape.length > 2) {
+    const pts = step.paperShape.map(p => `${p[0]+10},${p[1]+10}`).join(' ');
+    svgEl.appendChild(el('polygon', { points: pts, fill: 'var(--paper)', stroke: 'var(--text)',
+      'stroke-width': 0.8, 'stroke-linejoin': 'round', filter: 'url(#ps)' }));
+  }
+
+  // Existing creases
+  for (const c of (step.existingCreases || [])) {
+    svgEl.appendChild(el('line', {
+      x1: c.from[0]+10, y1: c.from[1]+10, x2: c.to[0]+10, y2: c.to[1]+10,
+      stroke: 'var(--crease)', 'stroke-width': 0.5, 'stroke-dasharray': '3,2', 'stroke-linecap': 'round'
+    }));
+  }
+
+  // New fold line
+  if (step.newFold) {
+    const f = step.newFold;
+    const color = f.type === 'mountain' ? 'var(--mountain)' : f.type === 'cut' ? 'var(--cut)' : 'var(--valley)';
+    const dash = f.type === 'mountain' ? '1.5,2,5,2' : f.type === 'cut' ? '1,1' : '4,2.5';
+    svgEl.appendChild(el('line', {
+      x1: f.from[0]+10, y1: f.from[1]+10, x2: f.to[0]+10, y2: f.to[1]+10,
+      stroke: color, 'stroke-width': 1.2, 'stroke-dasharray': dash, 'stroke-linecap': 'round',
+      class: 'fold-line-active'
+    }));
+  }
+
+  // Arrows
+  for (const a of (step.arrows || [])) {
+    const fx = a.from[0]+10, fy = a.from[1]+10, tx = a.to[0]+10, ty = a.to[1]+10;
+    if (a.type === 'turn-over') {
+      const cx = (fx+tx)/2, cy = (fy+ty)/2, r = 8;
+      svgEl.appendChild(el('path', {
+        d: `M ${cx-r} ${cy} A ${r} ${r} 0 1 1 ${cx+r-1} ${cy+1}`,
+        fill: 'none', stroke: '#666', 'stroke-width': 1, 'marker-end': 'url(#af)'
+      }));
+    } else {
+      const dx = tx-fx, dy = ty-fy, dist = Math.sqrt(dx*dx+dy*dy);
+      const curve = dist * 0.3;
+      const nx = -dy/Math.max(dist,1)*curve, ny = dx/Math.max(dist,1)*curve;
+      const mx = (fx+tx)/2+nx, my = (fy+ty)/2+ny;
+      svgEl.appendChild(el('path', {
+        d: `M ${fx} ${fy} Q ${mx} ${my} ${tx} ${ty}`,
+        fill: 'none', stroke: a.type === 'fold-behind' ? 'var(--mountain)' : 'var(--valley)',
+        'stroke-width': 1, 'stroke-dasharray': a.type === 'fold-behind' ? '2,2' : 'none',
+        'marker-end': a.type === 'fold-behind' ? 'url(#ab)' : 'url(#af)'
+      }));
+    }
+  }
+
+  // Step badge
+  const badge = el('g');
+  badge.appendChild(el('circle', { cx: 14, cy: 14, r: 7, fill: 'var(--accent)', opacity: .9 }));
+  const num = el('text', { x: 14, y: 17, 'text-anchor': 'middle', 'font-size': 7,
+    fill: '#fff', 'font-weight': 700, 'font-family': 'var(--font)' });
+  num.textContent = step.id;
+  badge.appendChild(num);
+  svgEl.appendChild(badge);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PART 7: DRAWING CANVAS
+// ══════════════════════════════════════════════════════════════════════
+
+const canvas = document.getElementById('drawCanvas');
+const ctx = canvas.getContext('2d');
+let drawVertices = [];
+let drawClosed = false;
+let mousePos = null;
+
+function canvasToCoord(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width * 100;
+  const y = (e.clientY - rect.top) / rect.height * 100;
+  // Snap to nearest 5
+  return [Math.round(x / 5) * 5, Math.round(y / 5) * 5];
+}
+
+function drawCanvasContent() {
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const s = w / 100;
+
+  // Grid
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 100; i += 10) {
+    ctx.beginPath(); ctx.moveTo(i*s, 0); ctx.lineTo(i*s, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i*s); ctx.lineTo(w, i*s); ctx.stroke();
+  }
+
+  // Edges
+  if (drawVertices.length > 1) {
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(drawVertices[0][0]*s, drawVertices[0][1]*s);
+    for (let i = 1; i < drawVertices.length; i++) {
+      ctx.lineTo(drawVertices[i][0]*s, drawVertices[i][1]*s);
+    }
+    if (drawClosed) ctx.closePath();
+    ctx.stroke();
+  }
+
+  // Preview edge
+  if (!drawClosed && drawVertices.length > 0 && mousePos) {
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    ctx.globalAlpha = 0.4;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 3]);
+    ctx.beginPath();
+    const last = drawVertices[drawVertices.length - 1];
+    ctx.moveTo(last[0]*s, last[1]*s);
+    ctx.lineTo(mousePos[0]*s, mousePos[1]*s);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
+
+  // Vertices
+  for (let i = 0; i < drawVertices.length; i++) {
+    const p = drawVertices[i];
+    ctx.fillStyle = i === 0 ? '#e74c3c' : getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    ctx.beginPath();
+    ctx.arc(p[0]*s, p[1]*s, i === 0 ? 5 : 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Fill if closed
+  if (drawClosed && drawVertices.length > 2) {
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    ctx.globalAlpha = 0.1;
+    ctx.beginPath();
+    ctx.moveTo(drawVertices[0][0]*s, drawVertices[0][1]*s);
+    for (const p of drawVertices) ctx.lineTo(p[0]*s, p[1]*s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+canvas.addEventListener('click', (e) => {
+  if (drawClosed) return;
+  const p = canvasToCoord(e);
+  // Close if near first vertex and we have >= 3 vertices
+  if (drawVertices.length >= 3 && vdist(p, drawVertices[0]) < 8) {
+    drawClosed = true;
+    selectedPreset = null;
+    updateGenerateBtn();
+    drawCanvasContent();
+    return;
+  }
+  drawVertices.push(p);
+  updateGenerateBtn();
+  drawCanvasContent();
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  mousePos = canvasToCoord(e);
+  if (!drawClosed) drawCanvasContent();
+});
+
+document.getElementById('undoBtn').addEventListener('click', () => {
+  if (drawClosed) { drawClosed = false; }
+  else { drawVertices.pop(); }
+  updateGenerateBtn();
+  drawCanvasContent();
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  drawVertices = [];
+  drawClosed = false;
+  mousePos = null;
+  updateGenerateBtn();
+  drawCanvasContent();
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// PART 8: APP STATE & UI
+// ══════════════════════════════════════════════════════════════════════
+
+let selectedPreset = null;
+let currentSteps = null;
+let currentStep = 0;
+let activeTab = 'gallery';
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    activeTab = tab.dataset.tab;
+    document.getElementById('gallerySection').style.display = activeTab === 'gallery' ? 'block' : 'none';
+    document.getElementById('drawSection').classList.toggle('visible', activeTab === 'draw');
+    if (activeTab === 'draw') drawCanvasContent();
+    updateGenerateBtn();
+  });
+});
+
+// Render preset gallery
+function renderGallery() {
+  const grid = document.getElementById('shapeGrid');
+  grid.innerHTML = '';
+  for (const preset of PRESETS) {
+    const card = document.createElement('div');
+    card.className = 'shape-card';
+    card.dataset.id = preset.id;
+    if (selectedPreset === preset.id) card.classList.add('selected');
+
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 120 120');
+    renderTargetShape(preset.polygon, svg);
+    card.appendChild(svg);
+
+    const name = document.createElement('div');
+    name.className = 'shape-name';
+    name.textContent = `${preset.emoji} ${preset.name}`;
+    card.appendChild(name);
+
+    card.addEventListener('click', () => {
+      selectedPreset = selectedPreset === preset.id ? null : preset.id;
+      document.querySelectorAll('.shape-card').forEach(c => c.classList.remove('selected'));
+      if (selectedPreset) card.classList.add('selected');
+      updateGenerateBtn();
+    });
+    grid.appendChild(card);
+  }
+}
+
+function updateGenerateBtn() {
+  const btn = document.getElementById('generateBtn');
+  if (activeTab === 'gallery') {
+    btn.disabled = !selectedPreset;
+  } else {
+    btn.disabled = !drawClosed || drawVertices.length < 3;
+  }
+}
+
+// Generate
+document.getElementById('generateBtn').addEventListener('click', () => {
+  let target, name, emoji;
+  if (activeTab === 'gallery' && selectedPreset) {
+    const p = PRESETS.find(s => s.id === selectedPreset);
+    target = p.polygon;
+    name = p.name;
+    emoji = p.emoji;
+  } else if (activeTab === 'draw' && drawClosed) {
+    target = drawVertices;
+    name = 'Custom Shape';
+    emoji = '✂️';
+  } else return;
+
+  // Normalize polygon to fit nicely in 10-90 range
+  target = normalizeToFit(target, 12, 88);
+
+  // Generate crease pattern
+  const pattern = generateCreasePattern(target);
+
+  // Generate steps
+  currentSteps = generateSteps(pattern, target);
+  currentStep = 0;
+
+  // Show result
+  const resultSection = document.getElementById('resultSection');
+  resultSection.classList.add('visible');
+  document.getElementById('resultTitle').textContent = `${emoji} ${name}`;
+  document.getElementById('resultInfo').textContent = `${pattern.creases.length} creases, ${currentSteps.length} steps`;
+
+  renderTargetShape(target, document.getElementById('targetSvg'));
+  renderCreasePattern(pattern, target, document.getElementById('creaseSvg'));
+  renderCurrentStep();
+
+  resultSection.scrollIntoView({ behavior: 'smooth' });
+});
+
+function normalizeToFit(poly, min, max) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of poly) {
+    minX = Math.min(minX, p[0]); minY = Math.min(minY, p[1]);
+    maxX = Math.max(maxX, p[0]); maxY = Math.max(maxY, p[1]);
+  }
+  const sx = (max - min) / Math.max(maxX - minX, 1);
+  const sy = (max - min) / Math.max(maxY - minY, 1);
+  const s = Math.min(sx, sy);
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const tx = (min + max) / 2, ty = (min + max) / 2;
+  return poly.map(p => [
+    Math.round((p[0] - cx) * s + tx),
+    Math.round((p[1] - cy) * s + ty)
+  ]);
+}
+
+// Step navigation
+function renderCurrentStep() {
+  if (!currentSteps || currentSteps.length === 0) return;
+  const step = currentSteps[currentStep];
+  const wrap = document.getElementById('stepSvgWrap');
+  wrap.classList.add('transitioning');
+  setTimeout(() => {
+    wrap.innerHTML = '';
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    renderStep(step, svg);
+    wrap.appendChild(svg);
+    wrap.classList.remove('transitioning');
+  }, 150);
+  document.getElementById('stepCounter').textContent = `Step ${currentStep + 1} of ${currentSteps.length}`;
+  document.getElementById('stepInstruction').textContent = step.instruction;
+  document.getElementById('progressFill').style.width = `${((currentStep + 1) / currentSteps.length) * 100}%`;
+  document.getElementById('prevBtn').disabled = currentStep === 0;
+  document.getElementById('nextBtn').disabled = currentStep === currentSteps.length - 1;
+}
+
+document.getElementById('prevBtn').addEventListener('click', () => {
+  if (currentStep > 0) { currentStep--; renderCurrentStep(); }
+});
+document.getElementById('nextBtn').addEventListener('click', () => {
+  if (currentSteps && currentStep < currentSteps.length - 1) { currentStep++; renderCurrentStep(); }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!currentSteps) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); document.getElementById('nextBtn').click(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); document.getElementById('prevBtn').click(); }
+});
+
+// Dark mode
+function initTheme() {
+  const saved = localStorage.getItem('foldable-theme');
+  if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+  updateThemeIcon();
+}
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  localStorage.setItem('foldable-theme', isDark ? 'light' : 'dark');
+  updateThemeIcon();
+  if (activeTab === 'draw') drawCanvasContent();
+}
+function updateThemeIcon() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.getElementById('themeToggle').innerHTML = isDark
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+}
+
+document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+// Init
+initTheme();
+renderGallery();
+</script>
+</body>
+
+</script>
+</body>
+</html>
