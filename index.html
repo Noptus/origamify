@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Origami Studio — Crease Pattern Editor</title>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>📐</text></svg>">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#1e1e1e;--surface:#2a2a2a;--surface2:#333;--text:#e0e0e0;--text2:#888;
+  --border:#444;--accent:#3498db;--accent2:#2980b9;
+  --mountain:#e74c3c;--valley:#3498db;--boundary:#ccc;--flat:#666;--unassigned:#f39c12;
+  --cut:#e67e22;--join:#9b59b6;
+  --pass:#2ecc71;--fail:#e74c3c;--warn:#f1c40f;
+  --paper:#f5f0e8;--paper-dark:#3a3530;
+  --font:'Satoshi',system-ui,-apple-system,sans-serif;
+  --radius:6px;
+}
+[data-theme="light"]{
+  --bg:#f0ede8;--surface:#fff;--surface2:#f5f3ee;--text:#222;--text2:#888;
+  --border:#ddd;--boundary:#333;--flat:#aaa;
+  --paper:#faf7f2;
+}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden}
+
+/* Toolbar */
+.toolbar{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--surface);
+  border-bottom:1px solid var(--border);height:44px;z-index:100}
+.toolbar .logo{font-weight:700;font-size:15px;margin-right:8px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.toolbar .logo svg{width:20px;height:20px}
+.tb-sep{width:1px;height:24px;background:var(--border);margin:0 4px}
+.tb-btn{padding:5px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface2);
+  color:var(--text);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font);transition:all .15s;
+  display:flex;align-items:center;gap:4px;white-space:nowrap}
+.tb-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tb-btn svg{width:14px;height:14px}
+.tb-btn:disabled{opacity:.35;cursor:not-allowed}
+.tb-group{display:flex;gap:2px}
+.dropdown{position:relative}
+.dropdown-menu{display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);min-width:160px;z-index:200;
+  box-shadow:0 8px 24px rgba(0,0,0,.3);overflow:hidden}
+.dropdown.open .dropdown-menu{display:block}
+.dropdown-menu button{display:block;width:100%;padding:8px 14px;border:none;background:none;color:var(--text);
+  font-size:13px;font-family:var(--font);cursor:pointer;text-align:left}
+.dropdown-menu button:hover{background:var(--accent);color:#fff}
+.toolbar .spacer{flex:1}
+
+/* Workspace */
+.workspace{display:flex;height:calc(100% - 44px - 28px)}
+
+/* Tool panel */
+.tool-panel{display:flex;flex-direction:column;gap:2px;padding:6px;background:var(--surface);
+  border-right:1px solid var(--border);width:42px;flex-shrink:0}
+.tool-btn{width:30px;height:30px;border-radius:var(--radius);border:1px solid transparent;
+  background:none;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:15px;transition:all .15s}
+.tool-btn:hover{background:var(--surface2);color:var(--text)}
+.tool-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tool-btn svg{width:16px;height:16px}
+
+/* Canvas */
+.canvas-area{flex:1;overflow:hidden;position:relative;background:var(--bg)}
+.canvas-area svg{width:100%;height:100%;display:block}
+
+/* Properties panel */
+.props-panel{width:220px;background:var(--surface);border-left:1px solid var(--border);padding:12px;
+  overflow-y:auto;font-size:12px;flex-shrink:0}
+.props-panel h3{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);
+  margin-bottom:6px;margin-top:12px}
+.props-panel h3:first-child{margin-top:0}
+.prop-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)}
+.prop-row .label{color:var(--text2)}
+.prop-row .value{font-weight:500}
+.prop-row.pass .value{color:var(--pass)}
+.prop-row.fail .value{color:var(--fail)}
+.prop-row.warn .value{color:var(--warn)}
+
+/* Status bar */
+.statusbar{display:flex;align-items:center;gap:12px;padding:4px 12px;background:var(--surface);
+  border-top:1px solid var(--border);height:28px;font-size:11px;color:var(--text2)}
+.statusbar .sep{width:1px;height:16px;background:var(--border)}
+.status-check{display:flex;align-items:center;gap:4px}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.status-dot.pass{background:var(--pass)}
+.status-dot.fail{background:var(--fail)}
+.status-dot.warn{background:var(--warn)}
+
+/* Drag overlay */
+.drag-overlay{position:fixed;inset:0;background:rgba(52,152,219,.15);border:3px dashed var(--accent);
+  z-index:300;display:none;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:var(--accent)}
+.drag-overlay.visible{display:flex}
+
+/* Responsive */
+@media(max-width:700px){
+  .props-panel{display:none}
+  .tool-panel{width:36px;padding:4px}
+  .tool-btn{width:26px;height:26px;font-size:13px}
+}
+/* Scrollbar */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Tooltip */
+.tooltip{position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:6px 10px;font-size:11px;color:var(--text);pointer-events:none;z-index:150;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);white-space:pre-line;display:none;max-width:260px}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+      <path d="M3 21L12 3L21 21H3Z" opacity=".3"/><path d="M3 21L12 3L21 21"/><path d="M7.5 14L12 6L16.5 14" opacity=".5"/>
+    </svg>
+    Origami Studio
+  </div>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btnImport" title="Import file">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+    Import
+  </button>
+  <input type="file" id="fileInput" hidden accept=".fold,.cp,.opx,.svg">
+  <div class="dropdown" id="exportDrop">
+    <button class="tb-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      Export
+    </button>
+    <div class="dropdown-menu">
+      <button data-fmt="fold">.fold (FOLD format)</button>
+      <button data-fmt="cp">.cp (ORIPA)</button>
+      <button data-fmt="svg">.svg (Vector)</button>
+      <button data-fmt="png">.png (Image)</button>
+    </div>
+  </div>
+  <div class="dropdown" id="examplesDrop">
+    <button class="tb-btn">Examples</button>
+    <div class="dropdown-menu" id="examplesList"></div>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-group">
+    <button class="tb-btn" id="btnUndo" title="Undo (Ctrl+Z)" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+    </button>
+    <button class="tb-btn" id="btnRedo" title="Redo (Ctrl+Y)" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.13-9.36L23 10"/></svg>
+    </button>
+  </div>
+  <div class="spacer"></div>
+  <button class="tb-btn" id="btnGrid" title="Toggle grid (G)">Grid</button>
+  <button class="tb-btn" id="btnCheck" title="Toggle foldability (F)">Check</button>
+  <button class="tb-btn" id="btnFit" title="Fit to view (0)">Fit</button>
+  <button class="tb-btn" id="btnTheme" title="Toggle theme">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+  </button>
+</div>
+
+<div class="workspace">
+  <div class="tool-panel">
+    <button class="tool-btn active" data-tool="select" title="Select (S)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 2l14 10-6 1.5L9 20z"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="crease" title="Add Crease (A)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="delete" title="Delete (D)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <button class="tool-btn" data-tool="move" title="Move (M)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>
+    </button>
+  </div>
+  <div class="canvas-area" id="canvasArea">
+    <svg id="canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+  <div class="props-panel" id="propsPanel">
+    <h3>File Info</h3>
+    <div id="fileInfo">
+      <div class="prop-row"><span class="label">Title</span><span class="value" id="propTitle">—</span></div>
+      <div class="prop-row"><span class="label">Author</span><span class="value" id="propAuthor">—</span></div>
+      <div class="prop-row"><span class="label">Format</span><span class="value" id="propFormat">—</span></div>
+    </div>
+    <h3>Statistics</h3>
+    <div id="statsInfo">
+      <div class="prop-row"><span class="label">Vertices</span><span class="value" id="propVerts">0</span></div>
+      <div class="prop-row"><span class="label">Edges</span><span class="value" id="propEdges">0</span></div>
+      <div class="prop-row"><span class="label">Faces</span><span class="value" id="propFaces">0</span></div>
+      <div class="prop-row"><span class="label">Mountain</span><span class="value" id="propM" style="color:var(--mountain)">0</span></div>
+      <div class="prop-row"><span class="label">Valley</span><span class="value" id="propV" style="color:var(--valley)">0</span></div>
+      <div class="prop-row"><span class="label">Boundary</span><span class="value" id="propB">0</span></div>
+      <div class="prop-row"><span class="label">Unassigned</span><span class="value" id="propU" style="color:var(--unassigned)">0</span></div>
+    </div>
+    <h3>Selection</h3>
+    <div id="selInfo">
+      <div class="prop-row"><span class="label">Type</span><span class="value" id="selType">None</span></div>
+      <div class="prop-row"><span class="label">Assignment</span><span class="value" id="selAssign">—</span></div>
+      <div class="prop-row"><span class="label">Length</span><span class="value" id="selLen">—</span></div>
+    </div>
+    <h3>Foldability</h3>
+    <div id="foldInfo">
+      <div class="prop-row" id="foldKawasaki"><span class="label">Kawasaki</span><span class="value">—</span></div>
+      <div class="prop-row" id="foldMaekawa"><span class="label">Maekawa</span><span class="value">—</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <span id="statusZoom">Zoom: 100%</span>
+  <span class="sep"></span>
+  <span id="statusCounts">V: 0  E: 0  F: 0</span>
+  <span class="sep"></span>
+  <span class="status-check" id="statusCheck"><span class="status-dot pass"></span> Ready</span>
+  <span class="sep"></span>
+  <span id="statusTool">Tool: Select</span>
+</div>
+
+<div class="drag-overlay" id="dragOverlay">Drop .fold, .cp, .opx, or .svg file here</div>
+
+<script>
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION A: CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+const EPS = 1e-9;
+const SVG_NS = "http://www.w3.org/2000/svg";
+const ASSIGN_COLORS = {M:'#e74c3c',V:'#3498db',B:'var(--boundary)',F:'var(--flat)',U:'#f39c12',C:'#e67e22',J:'#9b59b6'};
+const ASSIGN_DASH = {M:'',V:'8,4',B:'',F:'2,4',U:'4,4',C:'',J:''};
+const ASSIGN_WIDTH = {M:2,V:2,B:2.5,F:1.5,U:1.5,C:2,J:2};
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION B: DATA MODEL
+// ═══════════════════════════════════════════════════════════════
+function createEmptyCP() {
+  return {
+    vertices: [[0,0],[1,0],[1,1],[0,1]],
+    edges: [[0,1],[1,2],[2,3],[3,0]],
+    assignments: ['B','B','B','B'],
+    foldAngles: [0,0,0,0],
+    faces: [],
+    meta: {title:'',author:'',creator:'Origami Studio',format:'',paperSize:1}
+  };
+}
+function cloneCP(cp) {
+  return {
+    vertices: cp.vertices.map(v=>[...v]),
+    edges: cp.edges.map(e=>[...e]),
+    assignments: [...cp.assignments],
+    foldAngles: [...cp.foldAngles],
+    faces: cp.faces.map(f=>[...f]),
+    meta: {...cp.meta}
+  };
+}
+function buildAdjacency(cp) {
+  const map = new Map();
+  cp.vertices.forEach((_,i) => map.set(i, []));
+  cp.edges.forEach((e,i) => { map.get(e[0]).push(i); map.get(e[1]).push(i); });
+  return map;
+}
+function addVertex(cp, x, y) {
+  cp.vertices.push([x, y]);
+  return cp.vertices.length - 1;
+}
+function addEdge(cp, v0, v1, assign='M') {
+  cp.edges.push([v0, v1]);
+  cp.assignments.push(assign);
+  cp.foldAngles.push(assign==='M'?-180:assign==='V'?180:0);
+  return cp.edges.length - 1;
+}
+function removeEdge(cp, idx) {
+  cp.edges.splice(idx, 1);
+  cp.assignments.splice(idx, 1);
+  cp.foldAngles.splice(idx, 1);
+}
+function removeOrphanVertices(cp) {
+  const used = new Set();
+  cp.edges.forEach(e => { used.add(e[0]); used.add(e[1]); });
+  const remap = new Array(cp.vertices.length).fill(-1);
+  let ni = 0;
+  const newVerts = [];
+  for (let i = 0; i < cp.vertices.length; i++) {
+    if (used.has(i)) { remap[i] = ni++; newVerts.push(cp.vertices[i]); }
+  }
+  cp.vertices = newVerts;
+  cp.edges = cp.edges.map(e => [remap[e[0]], remap[e[1]]]);
+}
+function findVertex(cp, x, y, eps=0.005) {
+  for (let i = 0; i < cp.vertices.length; i++) {
+    if (Math.abs(cp.vertices[i][0]-x)<eps && Math.abs(cp.vertices[i][1]-y)<eps) return i;
+  }
+  return -1;
+}
+function findOrAddVertex(cp, x, y, eps=0.005) {
+  const i = findVertex(cp, x, y, eps);
+  return i >= 0 ? i : addVertex(cp, x, y);
+}
+function cycleAssignment(a) { return a==='M'?'V':a==='V'?'U':a==='U'?'M':'M'; }
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION C: GEOMETRY
+// ═══════════════════════════════════════════════════════════════
+function vsub(a,b){return[a[0]-b[0],a[1]-b[1]]}
+function vadd(a,b){return[a[0]+b[0],a[1]+b[1]]}
+function vscale(v,s){return[v[0]*s,v[1]*s]}
+function vdot(a,b){return a[0]*b[0]+a[1]*b[1]}
+function vcross(a,b){return a[0]*b[1]-a[1]*b[0]}
+function vlen(v){return Math.sqrt(v[0]*v[0]+v[1]*v[1])}
+function vnorm(v){const l=vlen(v);return l<EPS?[0,0]:[v[0]/l,v[1]/l]}
+function vdist(a,b){return vlen(vsub(a,b))}
+function vangle(v){return Math.atan2(v[1],v[0])}
+
+function ptSegDist(p, a, b) {
+  const d = vsub(b, a);
+  const len2 = vdot(d, d);
+  if (len2 < EPS) return { dist: vdist(p, a), t: 0 };
+  let t = vdot(vsub(p, a), d) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const proj = vadd(a, vscale(d, t));
+  return { dist: vdist(p, proj), t, proj };
+}
+
+function segSegIntersect(a0,a1,b0,b1) {
+  const da=vsub(a1,a0), db=vsub(b1,b0), dp=vsub(b0,a0);
+  const denom=vcross(da,db);
+  if(Math.abs(denom)<EPS) return null;
+  const t=vcross(dp,db)/denom, s=vcross(dp,da)/denom;
+  if(t>EPS&&t<1-EPS&&s>EPS&&s<1-EPS) return vadd(a0,vscale(da,t));
+  return null;
+}
+
+// Sort edges around a vertex by angle
+function sortedEdgesAtVertex(cp, vIdx) {
+  const adj = buildAdjacency(cp);
+  const edgeIndices = adj.get(vIdx) || [];
+  return edgeIndices.map(ei => {
+    const e = cp.edges[ei];
+    const other = e[0] === vIdx ? e[1] : e[0];
+    const dir = vsub(cp.vertices[other], cp.vertices[vIdx]);
+    return { edgeIdx: ei, angle: vangle(dir), otherVertex: other };
+  }).sort((a, b) => a.angle - b.angle);
+}
+
+// Compute sector angles between consecutive sorted edges at a vertex
+function sectorAngles(sorted) {
+  const n = sorted.length;
+  if (n < 2) return [];
+  const angles = [];
+  for (let i = 0; i < n; i++) {
+    let diff = sorted[(i+1)%n].angle - sorted[i].angle;
+    if (diff <= 0) diff += 2 * Math.PI;
+    angles.push(diff);
+  }
+  return angles;
+}
+
+function isOnBoundary(cp, vIdx, eps=0.005) {
+  const [x, y] = cp.vertices[vIdx];
+  return x < eps || x > 1-eps || y < eps || y > 1-eps;
+}
+
+// Snap to grid
+function snapToGrid(x, y, divs) {
+  const step = 1 / divs;
+  return [Math.round(x / step) * step, Math.round(y / step) * step];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION D: PARSERS
+// ═══════════════════════════════════════════════════════════════
+function detectFormat(name, content) {
+  const ext = name.split('.').pop().toLowerCase();
+  if (ext === 'fold') return 'fold';
+  if (ext === 'cp') return 'cp';
+  if (ext === 'opx') return 'opx';
+  if (ext === 'svg') return 'svg';
+  content = content.trim();
+  if (content[0] === '{') return 'fold';
+  if (content.startsWith('<?xml') && content.includes('oripa')) return 'opx';
+  if (content.startsWith('<?xml') || content.startsWith('<svg')) return 'svg';
+  if (/^\d+\s+-?[\d.]/.test(content)) return 'cp';
+  return null;
+}
+
+function importFile(name, content) {
+  const fmt = detectFormat(name, content);
+  if (!fmt) throw new Error('Unknown file format');
+  let cp;
+  if (fmt === 'fold') cp = parseFOLD(content);
+  else if (fmt === 'cp') cp = parseCP(content);
+  else if (fmt === 'opx') cp = parseOPX(content);
+  else if (fmt === 'svg') cp = parseSVG(content);
+  cp.meta.format = fmt;
+  return cp;
+}
+
+// ── FOLD Parser ──
+function parseFOLD(text) {
+  const data = JSON.parse(text);
+  // Find crease pattern frame
+  let frame = data;
+  if (data.file_frames && data.file_frames.length > 0) {
+    const cpFrame = data.file_frames.find(f => f.frame_classes && f.frame_classes.includes('creasePattern'));
+    if (cpFrame) frame = {...data, ...cpFrame};
+  }
+  const verts = (frame.vertices_coords || []).map(v => [v[0], v[1]]);
+  const edges = frame.edges_vertices || [];
+  const assigns = (frame.edges_assignment || []).map(a => a.toUpperCase());
+  const foldAng = frame.edges_foldAngle || assigns.map(a => a==='M'?-180:a==='V'?180:0);
+  // Normalize coords to [0,1]
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  verts.forEach(v => { minX=Math.min(minX,v[0]);minY=Math.min(minY,v[1]);maxX=Math.max(maxX,v[0]);maxY=Math.max(maxY,v[1]); });
+  const range = Math.max(maxX-minX, maxY-minY) || 1;
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const normVerts = verts.map(v => [(v[0]-cx)/range+0.5, (v[1]-cy)/range+0.5]);
+  return {
+    vertices: normVerts, edges, assignments: assigns, foldAngles: foldAng, faces: frame.faces_vertices||[],
+    meta: { title: frame.file_title||data.file_title||'', author: frame.file_author||data.file_author||'',
+            creator: frame.file_creator||data.file_creator||'', format:'fold', paperSize: range }
+  };
+}
+
+// ── CP Parser ──
+function parseCP(text) {
+  const lines = text.split('\n').map(l=>l.trim()).filter(l=>l&&!l.startsWith('#'));
+  const typeMap = {1:'B',2:'M',3:'V',4:'U',0:'U'};
+  const rawLines = [];
+  for (const line of lines) {
+    const parts = line.split(/\s+/).map(Number);
+    if (parts.length >= 5) {
+      rawLines.push({ type: typeMap[parts[0]]||'U', x1:parts[1], y1:parts[2], x2:parts[3], y2:parts[4] });
+    }
+  }
+  return buildCPFromRawLines(rawLines, 'cp');
+}
+
+// ── OPX Parser ──
+function parseOPX(text) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'text/xml');
+  const typeMap = {1:'B',2:'M',3:'V',0:'U',4:'U'};
+  const rawLines = [];
+  let title='', author='', paperSize=400;
+  // Extract metadata
+  const props = doc.querySelectorAll('void[property]');
+  props.forEach(p => {
+    const name = p.getAttribute('property');
+    if (name === 'title') title = p.querySelector('string')?.textContent || '';
+    if (name === 'originalAuthorName') author = p.querySelector('string')?.textContent || '';
+    if (name === 'paperSize') paperSize = parseFloat(p.querySelector('double,int')?.textContent || '400');
+  });
+  // Extract lines
+  const objects = doc.querySelectorAll('object[class="oripa.OriLineProxy"]');
+  objects.forEach(obj => {
+    const getProp = (n) => {
+      const el = obj.querySelector(`void[property="${n}"]`);
+      return el ? parseFloat(el.querySelector('double,int')?.textContent || '0') : 0;
+    };
+    const getType = () => {
+      const el = obj.querySelector('void[property="type"]');
+      return el ? parseInt(el.querySelector('int')?.textContent || '0') : 0;
+    };
+    rawLines.push({ type: typeMap[getType()]||'U', x1:getProp('x0'), y1:getProp('y0'), x2:getProp('x1'), y2:getProp('y1') });
+  });
+  const cp = buildCPFromRawLines(rawLines, 'opx');
+  cp.meta.title = title;
+  cp.meta.author = author;
+  return cp;
+}
+
+// ── SVG Parser ──
+function parseSVG(text) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'image/svg+xml');
+  const rawLines = [];
+  function colorToAssign(color) {
+    if (!color) return 'U';
+    color = color.toLowerCase().trim();
+    if (color.includes('red') || color === '#ff0000' || color === '#e74c3c' || color === 'crimson' || color.match(/#[cdef][0-3]/)) return 'M';
+    if (color.includes('blue') || color === '#0000ff' || color === '#3498db' || color === 'royalblue') return 'V';
+    if (color === '#000' || color === '#000000' || color === 'black') return 'B';
+    if (color.includes('gray') || color.includes('grey') || color === '#808080' || color === '#999' || color === '#aaa') return 'F';
+    if (color.includes('yellow') || color.includes('gold') || color === '#f39c12') return 'U';
+    // Check RGB values
+    const m = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i);
+    if (m) {
+      const r=parseInt(m[1],16), g=parseInt(m[2],16), b=parseInt(m[3],16);
+      if (r > 150 && g < 100 && b < 100) return 'M';
+      if (b > 150 && r < 100 && g < 100) return 'V';
+      if (r < 50 && g < 50 && b < 50) return 'B';
+      if (r > 200 && g > 200 && b < 100) return 'U';
+    }
+    return 'U';
+  }
+  function getStroke(el) {
+    return el.getAttribute('stroke') || el.style?.stroke || '';
+  }
+  // Parse <line> elements
+  doc.querySelectorAll('line').forEach(el => {
+    rawLines.push({ type: colorToAssign(getStroke(el)),
+      x1: parseFloat(el.getAttribute('x1')||0), y1: parseFloat(el.getAttribute('y1')||0),
+      x2: parseFloat(el.getAttribute('x2')||0), y2: parseFloat(el.getAttribute('y2')||0) });
+  });
+  // Parse <polyline> and <polygon>
+  doc.querySelectorAll('polyline,polygon').forEach(el => {
+    const pts = (el.getAttribute('points')||'').trim().split(/[\s,]+/).map(Number);
+    const assign = colorToAssign(getStroke(el));
+    for (let i = 0; i < pts.length - 3; i += 2) {
+      rawLines.push({ type: assign, x1:pts[i], y1:pts[i+1], x2:pts[i+2], y2:pts[i+3] });
+    }
+    if (el.tagName === 'polygon' && pts.length >= 4) {
+      rawLines.push({ type: assign, x1:pts[pts.length-2], y1:pts[pts.length-1], x2:pts[0], y2:pts[1] });
+    }
+  });
+  // Parse <path> (simple M/L/Z commands only)
+  doc.querySelectorAll('path').forEach(el => {
+    const d = el.getAttribute('d') || '';
+    const assign = colorToAssign(getStroke(el));
+    const cmds = d.match(/[MLZmlz][^MLZmlz]*/g) || [];
+    let cx=0,cy=0,sx=0,sy=0;
+    for (const cmd of cmds) {
+      const type = cmd[0];
+      const nums = (cmd.slice(1).match(/-?[\d.]+/g)||[]).map(Number);
+      if (type==='M') { cx=nums[0];cy=nums[1];sx=cx;sy=cy; }
+      else if (type==='m') { cx+=nums[0];cy+=nums[1];sx=cx;sy=cy; }
+      else if (type==='L') { rawLines.push({type:assign,x1:cx,y1:cy,x2:nums[0],y2:nums[1]});cx=nums[0];cy=nums[1]; }
+      else if (type==='l') { const nx=cx+nums[0],ny=cy+nums[1];rawLines.push({type:assign,x1:cx,y1:cy,x2:nx,y2:ny});cx=nx;cy=ny; }
+      else if (type==='Z'||type==='z') { if(Math.abs(cx-sx)>EPS||Math.abs(cy-sy)>EPS) rawLines.push({type:assign,x1:cx,y1:cy,x2:sx,y2:sy});cx=sx;cy=sy; }
+    }
+  });
+  return buildCPFromRawLines(rawLines, 'svg');
+}
+
+// ── Shared: build CP from raw line segments ──
+function buildCPFromRawLines(rawLines, format) {
+  if (rawLines.length === 0) return createEmptyCP();
+  // Collect all endpoints, deduplicate
+  let allPts = [];
+  rawLines.forEach(l => { allPts.push([l.x1,l.y1]); allPts.push([l.x2,l.y2]); });
+  // Find bounding box, normalize to [0,1]
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  allPts.forEach(p => { minX=Math.min(minX,p[0]);minY=Math.min(minY,p[1]);maxX=Math.max(maxX,p[0]);maxY=Math.max(maxY,p[1]); });
+  const range = Math.max(maxX-minX, maxY-minY) || 1;
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const norm = (x,y) => [(x-cx)/range+0.5, (y-cy)/range+0.5];
+
+  const vertices = [];
+  const edges = [];
+  const assignments = [];
+  const foldAngles = [];
+  const vertMap = new Map(); // "x,y" -> index
+  const epsSnap = 0.002;
+
+  function getVert(x, y) {
+    // Check existing vertices
+    for (let i = 0; i < vertices.length; i++) {
+      if (Math.abs(vertices[i][0]-x)<epsSnap && Math.abs(vertices[i][1]-y)<epsSnap) return i;
+    }
+    vertices.push([x, y]);
+    return vertices.length - 1;
+  }
+
+  rawLines.forEach(l => {
+    const [x1,y1] = norm(l.x1, l.y1);
+    const [x2,y2] = norm(l.x2, l.y2);
+    if (Math.abs(x1-x2)<EPS && Math.abs(y1-y2)<EPS) return; // skip zero-length
+    const v0 = getVert(x1, y1);
+    const v1 = getVert(x2, y2);
+    if (v0 === v1) return;
+    // Check duplicate edge
+    const dup = edges.some((e,i) => (e[0]===v0&&e[1]===v1)||(e[0]===v1&&e[1]===v0));
+    if (!dup) {
+      edges.push([v0, v1]);
+      assignments.push(l.type);
+      foldAngles.push(l.type==='M'?-180:l.type==='V'?180:0);
+    }
+  });
+
+  return { vertices, edges, assignments, foldAngles, faces: [],
+    meta: { title:'', author:'', creator:'', format, paperSize:range } };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION E: EXPORTERS
+// ═══════════════════════════════════════════════════════════════
+function exportFOLD(cp) {
+  return JSON.stringify({
+    file_spec: 1.2, file_creator: "Origami Studio", file_title: cp.meta.title||"Untitled",
+    file_author: cp.meta.author||"", frame_classes: ["creasePattern"], frame_attributes: ["2D"],
+    vertices_coords: cp.vertices.map(v=>[+v[0].toFixed(8),+v[1].toFixed(8)]),
+    edges_vertices: cp.edges, edges_assignment: cp.assignments,
+    edges_foldAngle: cp.foldAngles, faces_vertices: cp.faces
+  }, null, 2);
+}
+function exportCP(cp) {
+  const aMap = {B:1,M:2,V:3,U:4,F:4,C:4,J:4};
+  return cp.edges.map((e,i) => {
+    const v0=cp.vertices[e[0]], v1=cp.vertices[e[1]];
+    const s=400; // ORIPA standard
+    return `${aMap[cp.assignments[i]]||4} ${(v0[0]-0.5)*s} ${(v0[1]-0.5)*s} ${(v1[0]-0.5)*s} ${(v1[1]-0.5)*s}`;
+  }).join('\n');
+}
+function exportSVGStr(cp) {
+  const s = 400;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${s} ${s}">\n`;
+  svg += `<rect width="${s}" height="${s}" fill="#f5f0e8"/>\n`;
+  const groups = {};
+  cp.edges.forEach((e,i) => {
+    const a = cp.assignments[i];
+    if (!groups[a]) groups[a] = [];
+    const v0=cp.vertices[e[0]], v1=cp.vertices[e[1]];
+    const col = {M:'#e74c3c',V:'#3498db',B:'#000',F:'#999',U:'#f39c12'}[a]||'#999';
+    const dash = {M:'',V:'8,4',B:'',F:'2,4',U:'4,4'}[a]||'';
+    let line = `<line x1="${(v0[0]*s).toFixed(2)}" y1="${(v0[1]*s).toFixed(2)}" x2="${(v1[0]*s).toFixed(2)}" y2="${(v1[1]*s).toFixed(2)}" stroke="${col}" stroke-width="1.5"`;
+    if (dash) line += ` stroke-dasharray="${dash}"`;
+    line += `/>\n`;
+    groups[a] = (groups[a]||'') + line;
+  });
+  for (const [a, lines] of Object.entries(groups)) {
+    svg += `<g id="${a}-creases">\n${lines}</g>\n`;
+  }
+  svg += '</svg>';
+  return svg;
+}
+function downloadFile(content, filename, mime) {
+  const blob = new Blob([content], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION F: FLAT-FOLDABILITY CHECKER
+// ═══════════════════════════════════════════════════════════════
+function checkVertex(cp, vIdx) {
+  const result = { vertexIdx: vIdx, isBoundary: isOnBoundary(cp, vIdx),
+    kawasakiPass: true, kawasakiError: 0, maekawaPossible: true,
+    mountainCount: 0, valleyCount: 0, unassignedCount: 0, evenCreases: true, creaseCount: 0 };
+  if (result.isBoundary) return result;
+  const sorted = sortedEdgesAtVertex(cp, vIdx);
+  // Filter out boundary edges for crease counting
+  const creaseEdges = sorted.filter(s => cp.assignments[s.edgeIdx] !== 'B');
+  result.creaseCount = creaseEdges.length;
+  if (creaseEdges.length < 2) return result;
+  result.evenCreases = creaseEdges.length % 2 === 0;
+  // Count assignments
+  creaseEdges.forEach(s => {
+    const a = cp.assignments[s.edgeIdx];
+    if (a === 'M') result.mountainCount++;
+    else if (a === 'V') result.valleyCount++;
+    else result.unassignedCount++;
+  });
+  // Maekawa: |M - V| = 2
+  if (result.unassignedCount === 0) {
+    result.maekawaPossible = Math.abs(result.mountainCount - result.valleyCount) === 2;
+  } else {
+    // Check if any assignment of U edges could satisfy
+    const diff = Math.abs(result.mountainCount - result.valleyCount);
+    result.maekawaPossible = diff <= result.unassignedCount && (diff + result.unassignedCount) % 2 === 0;
+  }
+  // Kawasaki: alternating sector angles sum to pi
+  if (sorted.length >= 2 && sorted.length % 2 === 0) {
+    const sectors = sectorAngles(sorted);
+    let sumEven = 0, sumOdd = 0;
+    sectors.forEach((a,i) => { if (i%2===0) sumEven+=a; else sumOdd+=a; });
+    result.kawasakiError = Math.max(Math.abs(sumEven - Math.PI), Math.abs(sumOdd - Math.PI));
+    result.kawasakiPass = result.kawasakiError < 0.01; // ~0.5 degree tolerance
+  } else if (sorted.length % 2 !== 0) {
+    result.kawasakiPass = false;
+    result.kawasakiError = Infinity;
+  }
+  return result;
+}
+function checkAllVertices(cp) {
+  return cp.vertices.map((_, i) => checkVertex(cp, i));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION G: SVG RENDERER
+// ═══════════════════════════════════════════════════════════════
+function svgEl(tag, attrs={}) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+const state = {
+  cp: createEmptyCP(),
+  selectedEdges: new Set(),
+  selectedVertices: new Set(),
+  tool: 'select',
+  toolState: {},
+  view: { panX: 0, panY: 0, zoom: 1, width: 800, height: 600 },
+  showGrid: true,
+  gridDivisions: 8,
+  showFoldability: false,
+  snapToGrid: true,
+  snapToVertex: true,
+  hoverEdge: -1,
+  hoverVertex: -1,
+  vertexChecks: [],
+  undoStack: [],
+  redoStack: [],
+  isPanning: false,
+  panStart: null,
+  dragVertex: -1,
+  pendingCrease: null, // [x,y] first point for add-crease tool
+};
+
+function getCanvasSize() {
+  const area = document.getElementById('canvasArea');
+  return { width: area.clientWidth, height: area.clientHeight };
+}
+
+// Convert model coords [0,1] to screen SVG coords
+function modelToScreen(mx, my) {
+  const {width, height} = state.view;
+  const paperSize = Math.min(width, height) * 0.85;
+  const ox = (width - paperSize) / 2 + state.view.panX;
+  const oy = (height - paperSize) / 2 + state.view.panY;
+  return [ox + mx * paperSize * state.view.zoom, oy + my * paperSize * state.view.zoom];
+}
+
+function screenToModel(sx, sy) {
+  const {width, height} = state.view;
+  const paperSize = Math.min(width, height) * 0.85;
+  const ox = (width - paperSize) / 2 + state.view.panX;
+  const oy = (height - paperSize) / 2 + state.view.panY;
+  return [(sx - ox) / (paperSize * state.view.zoom), (sy - oy) / (paperSize * state.view.zoom)];
+}
+
+function renderAll() {
+  const svg = document.getElementById('canvas');
+  const {width, height} = getCanvasSize();
+  state.view.width = width;
+  state.view.height = height;
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.innerHTML = '';
+
+  const paperSize = Math.min(width, height) * 0.85;
+  const z = state.view.zoom;
+  const ox = (width - paperSize) / 2 + state.view.panX;
+  const oy = (height - paperSize) / 2 + state.view.panY;
+  const ps = paperSize * z;
+  const toX = x => ox + x * ps;
+  const toY = y => oy + y * ps;
+
+  // Paper background
+  svg.appendChild(svgEl('rect', {x:toX(0),y:toY(0),width:ps,height:ps,
+    fill:'var(--paper)', rx:2, stroke:'var(--boundary)', 'stroke-width':1}));
+
+  // Grid
+  if (state.showGrid) {
+    const g = svgEl('g', {opacity:'0.15'});
+    const d = state.gridDivisions;
+    for (let i = 1; i < d; i++) {
+      const t = i / d;
+      const w = (i % (d/2) === 0) ? 0.8 : (i % (d/4) === 0) ? 0.5 : 0.3;
+      g.appendChild(svgEl('line', {x1:toX(t),y1:toY(0),x2:toX(t),y2:toY(1),stroke:'var(--text)',
+        'stroke-width':w}));
+      g.appendChild(svgEl('line', {x1:toX(0),y1:toY(t),x2:toX(1),y2:toY(t),stroke:'var(--text)',
+        'stroke-width':w}));
+    }
+    svg.appendChild(g);
+  }
+
+  // Edges
+  const cp = state.cp;
+  cp.edges.forEach((e, i) => {
+    const v0 = cp.vertices[e[0]], v1 = cp.vertices[e[1]];
+    const a = cp.assignments[i];
+    const sel = state.selectedEdges.has(i);
+    const hov = state.hoverEdge === i;
+    const line = svgEl('line', {
+      x1:toX(v0[0]), y1:toY(v0[1]), x2:toX(v1[0]), y2:toY(v1[1]),
+      stroke: sel ? '#fff' : ASSIGN_COLORS[a] || '#888',
+      'stroke-width': (ASSIGN_WIDTH[a]||2) * (sel?1.5:1) * (hov?1.3:1),
+      'stroke-dasharray': ASSIGN_DASH[a] || '',
+      'stroke-linecap': 'round',
+      'data-edge': i,
+      style: `cursor:pointer;${hov?'filter:drop-shadow(0 0 3px '+ASSIGN_COLORS[a]+')':''}`
+    });
+    svg.appendChild(line);
+  });
+
+  // Vertices (show on hover/select)
+  cp.vertices.forEach((v, i) => {
+    const sel = state.selectedVertices.has(i);
+    const hov = state.hoverVertex === i;
+    if (sel || hov || state.tool === 'move' || state.tool === 'crease') {
+      const r = sel ? 4 : hov ? 3.5 : 2;
+      svg.appendChild(svgEl('circle', {
+        cx:toX(v[0]), cy:toY(v[1]), r,
+        fill: sel ? '#fff' : hov ? 'var(--accent)' : 'var(--text2)',
+        stroke: sel ? 'var(--accent)' : 'none', 'stroke-width': sel?2:0,
+        'data-vertex': i, style:'cursor:pointer'
+      }));
+    }
+  });
+
+  // Foldability indicators
+  if (state.showFoldability && state.vertexChecks.length > 0) {
+    state.vertexChecks.forEach(vc => {
+      if (vc.isBoundary || vc.creaseCount < 2) return;
+      const v = cp.vertices[vc.vertexIdx];
+      const pass = vc.kawasakiPass && vc.maekawaPossible && vc.evenCreases;
+      const warn = !pass && vc.unassignedCount > 0;
+      const color = pass ? 'var(--pass)' : warn ? 'var(--warn)' : 'var(--fail)';
+      svg.appendChild(svgEl('circle', {
+        cx:toX(v[0]), cy:toY(v[1]), r:5,
+        fill:color, opacity:0.8, 'data-check':vc.vertexIdx, style:'cursor:help'
+      }));
+      // Small label
+      const label = svgEl('text', {
+        x:toX(v[0]), y:toY(v[1])+1.5, 'text-anchor':'middle',
+        'font-size':6, fill:'#fff', 'font-weight':700, 'font-family':'var(--font)',
+        style:'pointer-events:none'
+      });
+      label.textContent = pass ? '✓' : warn ? '?' : '✗';
+      svg.appendChild(label);
+    });
+  }
+
+  // Tool overlay: pending crease line
+  if (state.pendingCrease && state.toolState.mousePos) {
+    const [mx, my] = state.toolState.mousePos;
+    svg.appendChild(svgEl('line', {
+      x1:toX(state.pendingCrease[0]), y1:toY(state.pendingCrease[1]),
+      x2:toX(mx), y2:toY(my),
+      stroke:'var(--accent)', 'stroke-width':1.5, 'stroke-dasharray':'6,3', opacity:.7
+    }));
+    svg.appendChild(svgEl('circle', {
+      cx:toX(state.pendingCrease[0]), cy:toY(state.pendingCrease[1]), r:3,
+      fill:'var(--accent)'
+    }));
+  }
+
+  updateUI();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION H: EDITOR / TOOLS / UNDO
+// ═══════════════════════════════════════════════════════════════
+function pushUndo(desc) {
+  state.undoStack.push({ cp: cloneCP(state.cp), desc });
+  if (state.undoStack.length > 50) state.undoStack.shift();
+  state.redoStack = [];
+  updateUndoButtons();
+}
+function undo() {
+  if (!state.undoStack.length) return;
+  state.redoStack.push({ cp: cloneCP(state.cp), desc:'redo' });
+  const entry = state.undoStack.pop();
+  state.cp = entry.cp;
+  state.selectedEdges.clear(); state.selectedVertices.clear();
+  refreshChecks(); renderAll();
+  updateUndoButtons();
+}
+function redo() {
+  if (!state.redoStack.length) return;
+  state.undoStack.push({ cp: cloneCP(state.cp), desc:'undo' });
+  const entry = state.redoStack.pop();
+  state.cp = entry.cp;
+  state.selectedEdges.clear(); state.selectedVertices.clear();
+  refreshChecks(); renderAll();
+  updateUndoButtons();
+}
+function updateUndoButtons() {
+  document.getElementById('btnUndo').disabled = !state.undoStack.length;
+  document.getElementById('btnRedo').disabled = !state.redoStack.length;
+}
+function refreshChecks() {
+  state.vertexChecks = state.showFoldability ? checkAllVertices(state.cp) : [];
+}
+
+// Hit testing
+function hitTestEdge(mx, my, threshold=0.015) {
+  let best = -1, bestDist = threshold;
+  state.cp.edges.forEach((e, i) => {
+    const r = ptSegDist([mx, my], state.cp.vertices[e[0]], state.cp.vertices[e[1]]);
+    if (r.dist < bestDist) { bestDist = r.dist; best = i; }
+  });
+  return best;
+}
+function hitTestVertex(mx, my, threshold=0.02) {
+  let best = -1, bestDist = threshold;
+  state.cp.vertices.forEach((v, i) => {
+    const d = vdist([mx,my], v);
+    if (d < bestDist) { bestDist = d; best = i; }
+  });
+  return best;
+}
+
+// Canvas events
+const canvasArea = document.getElementById('canvasArea');
+const svgCanvas = document.getElementById('canvas');
+
+function getMouseModel(e) {
+  const rect = canvasArea.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  return screenToModel(sx, sy);
+}
+
+function snapMouse(mx, my) {
+  if (state.snapToVertex) {
+    const vi = hitTestVertex(mx, my, 0.025);
+    if (vi >= 0) return [...state.cp.vertices[vi]];
+  }
+  if (state.snapToGrid) {
+    return snapToGrid(mx, my, state.gridDivisions);
+  }
+  return [mx, my];
+}
+
+svgCanvas.addEventListener('mousedown', e => {
+  if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    // Pan
+    state.isPanning = true;
+    state.panStart = [e.clientX - state.view.panX, e.clientY - state.view.panY];
+    e.preventDefault();
+    return;
+  }
+  if (e.button !== 0) return;
+  const [mx, my] = getMouseModel(e);
+
+  if (state.tool === 'select') {
+    const ei = hitTestEdge(mx, my);
+    if (ei >= 0) {
+      if (e.shiftKey) {
+        if (state.selectedEdges.has(ei)) state.selectedEdges.delete(ei);
+        else state.selectedEdges.add(ei);
+      } else {
+        state.selectedEdges.clear();
+        state.selectedEdges.add(ei);
+      }
+      state.selectedVertices.clear();
+    } else {
+      const vi = hitTestVertex(mx, my);
+      if (vi >= 0) {
+        state.selectedVertices.clear();
+        state.selectedVertices.add(vi);
+        state.selectedEdges.clear();
+      } else {
+        state.selectedEdges.clear();
+        state.selectedVertices.clear();
+      }
+    }
+    renderAll();
+  }
+  else if (state.tool === 'crease') {
+    const [sx, sy] = snapMouse(mx, my);
+    if (!state.pendingCrease) {
+      state.pendingCrease = [sx, sy];
+    } else {
+      // Second click: create crease
+      pushUndo('Add crease');
+      const v0 = findOrAddVertex(state.cp, state.pendingCrease[0], state.pendingCrease[1]);
+      const v1 = findOrAddVertex(state.cp, sx, sy);
+      if (v0 !== v1) addEdge(state.cp, v0, v1, 'M');
+      state.pendingCrease = null;
+      state.toolState.mousePos = null;
+      refreshChecks();
+      renderAll();
+    }
+  }
+  else if (state.tool === 'delete') {
+    const ei = hitTestEdge(mx, my);
+    if (ei >= 0) {
+      pushUndo('Delete crease');
+      removeEdge(state.cp, ei);
+      removeOrphanVertices(state.cp);
+      state.selectedEdges.clear();
+      refreshChecks();
+      renderAll();
+    }
+  }
+  else if (state.tool === 'move') {
+    const vi = hitTestVertex(mx, my);
+    if (vi >= 0) {
+      state.dragVertex = vi;
+      pushUndo('Move vertex');
+    }
+  }
+});
+
+svgCanvas.addEventListener('mousemove', e => {
+  if (state.isPanning && state.panStart) {
+    state.view.panX = e.clientX - state.panStart[0];
+    state.view.panY = e.clientY - state.panStart[1];
+    renderAll();
+    return;
+  }
+  const [mx, my] = getMouseModel(e);
+
+  if (state.tool === 'move' && state.dragVertex >= 0) {
+    const [sx, sy] = snapMouse(mx, my);
+    state.cp.vertices[state.dragVertex] = [sx, sy];
+    renderAll();
+    return;
+  }
+
+  if (state.tool === 'crease' && state.pendingCrease) {
+    state.toolState.mousePos = snapMouse(mx, my);
+    renderAll();
+    return;
+  }
+
+  // Hover
+  const newHoverEdge = hitTestEdge(mx, my);
+  const newHoverVertex = hitTestVertex(mx, my);
+  if (newHoverEdge !== state.hoverEdge || newHoverVertex !== state.hoverVertex) {
+    state.hoverEdge = newHoverEdge;
+    state.hoverVertex = newHoverVertex;
+    renderAll();
+  }
+
+  // Tooltip for foldability
+  if (state.showFoldability) {
+    const vi = hitTestVertex(mx, my, 0.03);
+    const tooltip = document.getElementById('tooltip');
+    if (vi >= 0) {
+      const vc = state.vertexChecks.find(c => c.vertexIdx === vi);
+      if (vc && !vc.isBoundary && vc.creaseCount >= 2) {
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.clientX + 12) + 'px';
+        tooltip.style.top = (e.clientY - 10) + 'px';
+        tooltip.textContent = `Vertex ${vi}\nKawasaki: ${vc.kawasakiPass?'PASS':'FAIL'} (err: ${(vc.kawasakiError*180/Math.PI).toFixed(2)}°)\nMaekawa: ${vc.maekawaPossible?'OK':'FAIL'} (M:${vc.mountainCount} V:${vc.valleyCount} U:${vc.unassignedCount})\nCreases: ${vc.creaseCount} (${vc.evenCreases?'even':'ODD'})`;
+        return;
+      }
+    }
+    tooltip.style.display = 'none';
+  }
+});
+
+svgCanvas.addEventListener('mouseup', e => {
+  state.isPanning = false;
+  state.panStart = null;
+  state.dragVertex = -1;
+});
+
+svgCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 0.9 : 1.1;
+  const rect = canvasArea.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  // Zoom toward mouse
+  state.view.panX = mx - (mx - state.view.panX) * factor;
+  state.view.panY = my - (my - state.view.panY) * factor;
+  state.view.zoom *= factor;
+  state.view.zoom = Math.max(0.1, Math.min(20, state.view.zoom));
+  renderAll();
+}, {passive: false});
+
+// Double click to cycle M/V/U
+svgCanvas.addEventListener('dblclick', e => {
+  const [mx, my] = getMouseModel(e);
+  const ei = hitTestEdge(mx, my);
+  if (ei >= 0 && state.cp.assignments[ei] !== 'B') {
+    pushUndo('Cycle assignment');
+    state.cp.assignments[ei] = cycleAssignment(state.cp.assignments[ei]);
+    refreshChecks();
+    renderAll();
+  }
+});
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); return; }
+  if (e.key === 's' || e.key === 'S') setTool('select');
+  if (e.key === 'a' || e.key === 'A') setTool('crease');
+  if (e.key === 'd' || e.key === 'D') setTool('delete');
+  if (e.key === 'm' && !e.ctrlKey) setTool('move');
+  if (e.key === 'g' || e.key === 'G') { state.showGrid = !state.showGrid; renderAll(); }
+  if (e.key === 'f' || e.key === 'F') { state.showFoldability = !state.showFoldability; refreshChecks(); renderAll(); }
+  if (e.key === '0') fitToView();
+  if (e.key === ' ' && state.selectedEdges.size > 0) {
+    e.preventDefault();
+    pushUndo('Cycle assignment');
+    for (const ei of state.selectedEdges) {
+      if (state.cp.assignments[ei] !== 'B') {
+        state.cp.assignments[ei] = cycleAssignment(state.cp.assignments[ei]);
+      }
+    }
+    refreshChecks(); renderAll();
+  }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (state.selectedEdges.size > 0) {
+      pushUndo('Delete selected');
+      const sorted = [...state.selectedEdges].sort((a,b) => b-a);
+      sorted.forEach(ei => removeEdge(state.cp, ei));
+      removeOrphanVertices(state.cp);
+      state.selectedEdges.clear();
+      refreshChecks(); renderAll();
+    }
+  }
+  if (e.key === 'Escape') {
+    state.pendingCrease = null;
+    state.selectedEdges.clear();
+    state.selectedVertices.clear();
+    state.toolState = {};
+    renderAll();
+  }
+});
+
+function setTool(name) {
+  state.tool = name;
+  state.pendingCrease = null;
+  state.toolState = {};
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === name));
+  document.getElementById('statusTool').textContent = 'Tool: ' + {select:'Select',crease:'Add Crease',delete:'Delete',move:'Move'}[name];
+  renderAll();
+}
+function fitToView() {
+  state.view.panX = 0; state.view.panY = 0; state.view.zoom = 1;
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION I: BUNDLED EXAMPLES
+// ═══════════════════════════════════════════════════════════════
+const EXAMPLES = {
+  "Crane (traditional)": {"vertices_coords":[[0,0],[1,0],[1,1],[0,1],[0.5,0.5],[0.5,0],[1,0.5],[0.5,1],[0,0.5],[0.25,0.25],[0.75,0.25],[0.75,0.75],[0.25,0.75],[0.5,0.15],[0.85,0.5],[0.5,0.85],[0.15,0.5]],"edges_vertices":[[0,1],[1,2],[2,3],[3,0],[0,4],[1,4],[2,4],[3,4],[0,9],[9,4],[1,10],[10,4],[2,11],[11,4],[3,12],[12,4],[4,13],[13,5],[4,14],[14,6],[4,15],[15,7],[4,16],[16,8]],"edges_assignment":["B","B","B","B","V","V","V","V","M","M","M","M","M","M","M","M","V","V","V","V","V","V","V","V"]},
+  "Bird Base": {"vertices_coords":[[0,0],[0.5,0],[1,0],[1,0.5],[1,1],[0.5,1],[0,1],[0,0.5],[0.5,0.5],[0.25,0.25],[0.75,0.25],[0.75,0.75],[0.25,0.75]],"edges_vertices":[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,0],[0,8],[2,8],[4,8],[6,8],[1,8],[3,8],[5,8],[7,8],[0,9],[9,8],[1,9],[2,10],[10,8],[3,10],[4,11],[11,8],[5,11],[6,12],[12,8],[7,12]],"edges_assignment":["B","B","B","B","B","B","B","B","V","V","V","V","M","M","M","M","M","M","M","M","M","M","M","M","M","M","M","M"]},
+  "Fish Base": {"vertices_coords":[[0,0],[1,0],[1,1],[0,1],[0.5,0.5],[0,0.5],[0.5,0],[0.5,1],[1,0.5]],"edges_vertices":[[0,1],[1,2],[2,3],[3,0],[0,4],[2,4],[0,6],[6,4],[0,5],[5,4],[2,8],[8,4],[2,7],[7,4]],"edges_assignment":["B","B","B","B","V","V","M","M","M","M","M","M","M","M"]},
+  "Waterbomb Base": {"vertices_coords":[[0,0],[0.5,0],[1,0],[1,0.5],[1,1],[0.5,1],[0,1],[0,0.5],[0.5,0.5]],"edges_vertices":[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,0],[0,8],[2,8],[4,8],[6,8],[1,8],[3,8],[5,8],[7,8]],"edges_assignment":["B","B","B","B","B","B","B","B","V","V","V","V","M","M","M","M"]},
+  "Preliminary Base": {"vertices_coords":[[0,0],[0.5,0],[1,0],[1,0.5],[1,1],[0.5,1],[0,1],[0,0.5],[0.5,0.5]],"edges_vertices":[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,0],[0,8],[2,8],[4,8],[6,8],[1,8],[3,8],[5,8],[7,8]],"edges_assignment":["B","B","B","B","B","B","B","B","M","M","M","M","V","V","V","V"]},
+  "Kite Base": {"vertices_coords":[[0,0],[1,0],[1,1],[0,1],[0.5,0.5],[0,0.5],[0.5,0]],"edges_vertices":[[0,1],[1,2],[2,3],[3,0],[0,4],[2,4],[0,6],[6,1],[0,5],[5,3]],"edges_assignment":["B","B","B","B","V","F","M","B","M","B"]},
+  "Windmill Base": {"vertices_coords":[[0,0],[0.5,0],[1,0],[1,0.5],[1,1],[0.5,1],[0,1],[0,0.5],[0.5,0.5],[0.25,0.25],[0.75,0.25],[0.75,0.75],[0.25,0.75]],"edges_vertices":[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,0],[0,8],[2,8],[4,8],[6,8],[1,8],[3,8],[5,8],[7,8],[9,1],[9,7],[10,1],[10,3],[11,3],[11,5],[12,5],[12,7]],"edges_assignment":["B","B","B","B","B","B","B","B","V","V","V","V","M","M","M","M","V","V","V","V","V","V","V","V"]},
+  "Frog Base": {"vertices_coords":[[0,0],[0.5,0],[1,0],[1,0.5],[1,1],[0.5,1],[0,1],[0,0.5],[0.5,0.5],[0.25,0],[0,0.25],[0.75,0],[1,0.25],[1,0.75],[0.75,1],[0.25,1],[0,0.75],[0.25,0.25],[0.75,0.25],[0.75,0.75],[0.25,0.75]],"edges_vertices":[[0,9],[9,1],[1,12],[12,2],[2,13],[13,4],[4,14],[14,5],[5,16],[16,6],[6,11],[11,0],[0,17],[17,8],[1,18],[18,8],[2,19],[19,8],[4,19],[5,20],[20,8],[6,17],[9,17],[9,18],[11,17],[11,20],[12,18],[12,19],[13,19],[14,19],[14,20],[16,20]],"edges_assignment":["B","B","B","B","B","B","B","B","B","B","B","B","V","V","V","V","M","M","V","V","V","V","M","M","M","M","M","M","M","M","M","M"]}
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION J: UI WIRING
+// ═══════════════════════════════════════════════════════════════
+function updateUI() {
+  const cp = state.cp;
+  // Stats
+  const counts = {M:0,V:0,B:0,F:0,U:0};
+  cp.assignments.forEach(a => { counts[a] = (counts[a]||0) + 1; });
+  document.getElementById('propVerts').textContent = cp.vertices.length;
+  document.getElementById('propEdges').textContent = cp.edges.length;
+  document.getElementById('propFaces').textContent = cp.faces.length || '—';
+  document.getElementById('propM').textContent = counts.M;
+  document.getElementById('propV').textContent = counts.V;
+  document.getElementById('propB').textContent = counts.B;
+  document.getElementById('propU').textContent = counts.U + (counts.F||0);
+  document.getElementById('propTitle').textContent = cp.meta.title || '—';
+  document.getElementById('propAuthor').textContent = cp.meta.author || '—';
+  document.getElementById('propFormat').textContent = cp.meta.format || '—';
+  document.getElementById('statusZoom').textContent = `Zoom: ${Math.round(state.view.zoom*100)}%`;
+  document.getElementById('statusCounts').textContent = `V: ${cp.vertices.length}  E: ${cp.edges.length}`;
+
+  // Selection info
+  if (state.selectedEdges.size === 1) {
+    const ei = [...state.selectedEdges][0];
+    document.getElementById('selType').textContent = 'Edge';
+    document.getElementById('selAssign').textContent = cp.assignments[ei];
+    document.getElementById('selAssign').style.color = ASSIGN_COLORS[cp.assignments[ei]];
+    const e = cp.edges[ei];
+    document.getElementById('selLen').textContent = vdist(cp.vertices[e[0]], cp.vertices[e[1]]).toFixed(4);
+  } else if (state.selectedVertices.size === 1) {
+    const vi = [...state.selectedVertices][0];
+    document.getElementById('selType').textContent = 'Vertex';
+    document.getElementById('selAssign').textContent = `(${cp.vertices[vi][0].toFixed(3)}, ${cp.vertices[vi][1].toFixed(3)})`;
+    document.getElementById('selAssign').style.color = '';
+    document.getElementById('selLen').textContent = '—';
+  } else {
+    document.getElementById('selType').textContent = state.selectedEdges.size > 0 ? `${state.selectedEdges.size} edges` : 'None';
+    document.getElementById('selAssign').textContent = '—';
+    document.getElementById('selAssign').style.color = '';
+    document.getElementById('selLen').textContent = '—';
+  }
+
+  // Foldability summary
+  if (state.showFoldability && state.vertexChecks.length > 0) {
+    const interior = state.vertexChecks.filter(vc => !vc.isBoundary && vc.creaseCount >= 2);
+    const passing = interior.filter(vc => vc.kawasakiPass && vc.maekawaPossible && vc.evenCreases);
+    const failing = interior.length - passing.length;
+    const dot = document.querySelector('#statusCheck .status-dot');
+    const text = document.querySelector('#statusCheck');
+    if (failing === 0) { dot.className='status-dot pass'; text.lastChild.textContent=` All ${interior.length} vertices OK`; }
+    else { dot.className='status-dot fail'; text.lastChild.textContent=` ${failing}/${interior.length} vertices failing`; }
+    // Props panel
+    document.querySelector('#foldKawasaki .value').textContent = `${passing.length}/${interior.length} pass`;
+    document.querySelector('#foldKawasaki').className = 'prop-row ' + (failing?'fail':'pass');
+    document.querySelector('#foldMaekawa .value').textContent = interior.filter(vc=>vc.maekawaPossible).length + '/' + interior.length + ' pass';
+  } else {
+    document.querySelector('#statusCheck .status-dot').className = 'status-dot pass';
+    document.querySelector('#statusCheck').lastChild.textContent = ' Ready';
+  }
+}
+
+function loadCP(cp) {
+  state.cp = cp;
+  state.selectedEdges.clear();
+  state.selectedVertices.clear();
+  state.undoStack = [];
+  state.redoStack = [];
+  state.pendingCrease = null;
+  state.toolState = {};
+  state.view.panX = 0; state.view.panY = 0; state.view.zoom = 1;
+  refreshChecks();
+  updateUndoButtons();
+  renderAll();
+}
+
+// Import button
+document.getElementById('btnImport').addEventListener('click', () => document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const cp = importFile(file.name, reader.result);
+      loadCP(cp);
+    } catch(err) { alert('Import error: ' + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// Drag and drop
+const dragOverlay = document.getElementById('dragOverlay');
+document.addEventListener('dragover', e => { e.preventDefault(); dragOverlay.classList.add('visible'); });
+document.addEventListener('dragleave', e => { if (e.target === dragOverlay) dragOverlay.classList.remove('visible'); });
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  dragOverlay.classList.remove('visible');
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const cp = importFile(file.name, reader.result);
+      loadCP(cp);
+    } catch(err) { alert('Import error: ' + err.message); }
+  };
+  reader.readAsText(file);
+});
+
+// Export dropdown
+document.getElementById('exportDrop').querySelector('.tb-btn').addEventListener('click', () => {
+  document.getElementById('exportDrop').classList.toggle('open');
+});
+document.getElementById('exportDrop').querySelectorAll('[data-fmt]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const fmt = btn.dataset.fmt;
+    const name = state.cp.meta.title || 'origami';
+    if (fmt === 'fold') downloadFile(exportFOLD(state.cp), name+'.fold', 'application/json');
+    else if (fmt === 'cp') downloadFile(exportCP(state.cp), name+'.cp', 'text/plain');
+    else if (fmt === 'svg') downloadFile(exportSVGStr(state.cp), name+'.svg', 'image/svg+xml');
+    else if (fmt === 'png') {
+      const svgStr = exportSVGStr(state.cp);
+      const blob = new Blob([svgStr], {type:'image/svg+xml'});
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = 1600; c.height = 1600;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, 1600, 1600);
+        c.toBlob(b => { downloadFile(b, name+'.png', 'image/png'); URL.revokeObjectURL(url); }, 'image/png');
+      };
+      img.src = url;
+    }
+    document.getElementById('exportDrop').classList.remove('open');
+  });
+});
+
+// Examples dropdown
+const exList = document.getElementById('examplesList');
+document.getElementById('examplesDrop').querySelector('.tb-btn').addEventListener('click', () => {
+  document.getElementById('examplesDrop').classList.toggle('open');
+});
+for (const [name, data] of Object.entries(EXAMPLES)) {
+  const btn = document.createElement('button');
+  btn.textContent = name;
+  btn.addEventListener('click', () => {
+    const cp = parseFOLD(JSON.stringify(data));
+    cp.meta.title = name;
+    loadCP(cp);
+    document.getElementById('examplesDrop').classList.remove('open');
+  });
+  exList.appendChild(btn);
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click', e => {
+  document.querySelectorAll('.dropdown').forEach(d => {
+    if (!d.contains(e.target)) d.classList.remove('open');
+  });
+});
+
+// Tool buttons
+document.querySelectorAll('.tool-btn').forEach(btn => {
+  btn.addEventListener('click', () => setTool(btn.dataset.tool));
+});
+
+// Toolbar buttons
+document.getElementById('btnGrid').addEventListener('click', () => { state.showGrid = !state.showGrid; renderAll(); });
+document.getElementById('btnCheck').addEventListener('click', () => { state.showFoldability = !state.showFoldability; refreshChecks(); renderAll(); });
+document.getElementById('btnFit').addEventListener('click', fitToView);
+document.getElementById('btnUndo').addEventListener('click', undo);
+document.getElementById('btnRedo').addEventListener('click', redo);
+
+// Theme
+function initTheme() {
+  const saved = localStorage.getItem('os-theme');
+  if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
+}
+document.getElementById('btnTheme').addEventListener('click', () => {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  document.documentElement.setAttribute('data-theme', isLight ? '' : 'light');
+  localStorage.setItem('os-theme', isLight ? 'dark' : 'light');
+  renderAll();
+});
+
+// Resize
+window.addEventListener('resize', () => renderAll());
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+initTheme();
+// Load crane by default
+const defaultCP = parseFOLD(JSON.stringify(EXAMPLES["Crane (traditional)"]));
+defaultCP.meta.title = "Crane (traditional)";
+loadCP(defaultCP);
+
+</script>
+</body>
+</html>
